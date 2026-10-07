@@ -106,9 +106,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <a href="#how-it-works" className="hover:text-amber-400 transition-colors">
               How Escrow Works
             </a>
-            <a href="#live-challenges" className="hover:text-amber-400 transition-colors">
-              Live Challenges
-            </a>
             <a href="#faq" className="hover:text-amber-400 transition-colors">
               FAQ
             </a>
@@ -471,93 +468,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         </div>
       </section>
 
-      {/* 5. LIVE CHALLENGES & OPEN ROOMS */}
-      <section id="live-challenges" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 border-b border-neutral-800/80 space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <div className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-400 uppercase tracking-wider">
-              <Flame className="w-4 h-4" />
-              <span>Live Wager Lobby</span>
-            </div>
-            <h2 className="text-2xl sm:text-3xl font-black font-heading text-white mt-1">
-              OPEN CHALLENGES WAITING FOR OPPONENTS
-            </h2>
-            <p className="text-xs text-neutral-400">
-              Join any open wager immediately. Your stake will be matched and escrowed on acceptance.
-            </p>
-          </div>
 
-          <button
-            onClick={() => onOpenAuth('signin')}
-            className="px-4 py-2 bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-xs font-bold text-neutral-200 rounded-xl transition-colors cursor-pointer self-start sm:self-auto flex items-center gap-1.5"
-          >
-            <span>Sign In to Play</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
-
-        {openChallenges.length === 0 ? (
-          <div className="p-8 rounded-2xl bg-neutral-900/60 border border-neutral-800 text-center space-y-3">
-            <Swords className="w-8 h-8 text-neutral-500 mx-auto" />
-            <div className="text-sm font-bold text-white">No Open Challenges Right Now</div>
-            <p className="text-xs text-neutral-400 max-w-md mx-auto">
-              Be the first to create a ₦1,000 wager! Your room code will be generated instantly to share with opponents.
-            </p>
-            <button
-              onClick={() => onOpenAuth('signup')}
-              className="px-5 py-2.5 bg-amber-400 hover:bg-amber-300 text-neutral-950 font-bold rounded-xl text-xs transition-all cursor-pointer"
-            >
-              Sign Up to Create First Bet
-            </button>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {openChallenges.slice(0, 6).map((match) => {
-              const pot = match.stakeAmount * 2;
-              const payout = pot - Math.round(pot * 0.10);
-              return (
-                <div
-                  key={match.id}
-                  className="p-5 rounded-2xl bg-neutral-900 border border-neutral-800 hover:border-amber-400/50 transition-all space-y-3"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-mono-nums bg-amber-500/10 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded font-bold">
-                      {match.roomCode || match.challengeCode}
-                    </span>
-                    <span className="text-xs font-mono-nums font-bold text-emerald-400">
-                      ₦{match.stakeAmount.toLocaleString()} Stake
-                    </span>
-                  </div>
-
-                  <div>
-                    <h4 className="font-bold text-white text-sm">{match.gameMode}</h4>
-                    <div className="text-xs text-neutral-400">Map: {match.map}</div>
-                  </div>
-
-                  <div className="pt-2 border-t border-neutral-800 flex items-center justify-between text-xs">
-                    <div>
-                      <div className="text-[10px] text-neutral-500">Creator</div>
-                      <div className="font-bold text-neutral-300">{match.creator.codmIgn}</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-[10px] text-neutral-500">Winner Takes</div>
-                      <div className="font-bold text-amber-400 font-mono-nums">₦{payout.toLocaleString()}</div>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => onOpenAuth('signup')}
-                    className="w-full py-2.5 bg-amber-400 hover:bg-amber-300 text-neutral-950 font-black rounded-xl text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5"
-                  >
-                    <Swords className="w-3.5 h-3.5" />
-                    <span>Sign In to Accept & Lock ₦{match.stakeAmount.toLocaleString()}</span>
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
 
       {/* 6. HOW ESCROW WORKS (ARCHITECTURE) */}
       <section id="how-it-works" className="bg-neutral-900/50 border-b border-neutral-800 py-16">

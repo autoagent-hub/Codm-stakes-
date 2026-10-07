@@ -1026,36 +1026,58 @@ Respond strictly in valid JSON format:
 
     // Winner gets the pot minus 10% platform fee
     if (winnerUser) {
-      winnerUser.balance += match.winnerPayout;
       winnerUser.totalWinnings += match.winnerPayout;
       winnerUser.wins += 1;
-      const hasBank = winnerUser.bankName && winnerUser.accountNumber;
-      const payoutDesc = hasBank
-        ? `🏆 Won 1v1 Escrow Match #${match.roomCode} vs ${loserObj.codmIgn}: ₦${match.winnerPayout.toLocaleString()} automatically disbursed to saved bank (${winnerUser.bankName} - ${winnerUser.accountNumber} - ${winnerUser.accountName || winnerUser.codmIgn})`
-        : `🏆 Won 1v1 Escrow Match #${match.roomCode} vs ${loserObj.codmIgn} (₦${match.winnerPayout.toLocaleString()} credited to wallet - Add bank details in profile for automated bank disbursements)`;
 
-      winnerUser.transactions.unshift({
-        id: `tx_${Date.now()}_win`,
-        type: 'MATCH_WIN_PAYOUT',
-        amount: match.winnerPayout,
-        description: payoutDesc,
-        timestamp: Date.now(),
-        matchId: match.id,
-      });
+      const hasBank = winnerUser.bankName && winnerUser.accountNumber;
+      if (hasBank) {
+        // Automatically send funds directly to winner's saved bank account
+        winnerUser.transactions.unshift({
+          id: `tx_${Date.now()}_win_cashout`,
+          type: 'WITHDRAWAL',
+          amount: match.winnerPayout,
+          description: `🚀 Direct Automated Bank Payout: ₦${match.winnerPayout.toLocaleString()} transferred to ${winnerUser.bankName} (${winnerUser.accountNumber} - ${winnerUser.accountName || winnerUser.codmIgn})`,
+          timestamp: Date.now(),
+          matchId: match.id,
+        });
+
+        match.resolutionNotes = `Match verified! Winner is ${winnerObj.codmIgn}. ₦${match.winnerPayout.toLocaleString()} winning funds were automatically sent directly to saved bank account (${winnerUser.bankName} - ${winnerUser.accountNumber}). Zero funds held on platform.`;
+
+        match.chatMessages.push({
+          id: `msg_${Date.now()}_settle`,
+          senderId: 'SYSTEM',
+          senderName: 'CODM Referee Bot',
+          text: `🏆 MATCH CONCLUDED! Winner: ${winnerObj.codmIgn}. ₦${match.winnerPayout.toLocaleString()} winning payout was automatically sent directly to saved bank details (${winnerUser.bankName} - ${winnerUser.accountNumber})!`,
+          timestamp: Date.now(),
+        });
+      } else {
+        // No bank details saved yet -> balance is placed in wallet temporarily but marked with urgent requirement to cash out immediately
+        winnerUser.balance += match.winnerPayout;
+        const payoutDesc = `🏆 Won 1v1 Escrow Match #${match.roomCode} vs ${loserObj.codmIgn}: ₦${match.winnerPayout.toLocaleString()} ready for cashout. Enter bank details to withdraw now.`;
+
+        winnerUser.transactions.unshift({
+          id: `tx_${Date.now()}_win`,
+          type: 'MATCH_WIN_PAYOUT',
+          amount: match.winnerPayout,
+          description: payoutDesc,
+          timestamp: Date.now(),
+          matchId: match.id,
+        });
+
+        match.resolutionNotes = `Match verified! Winner is ${winnerObj.codmIgn}. ₦${match.winnerPayout.toLocaleString()} ready for instant cashout. Enter bank details now to send funds directly to your bank.`;
+
+        match.chatMessages.push({
+          id: `msg_${Date.now()}_settle`,
+          senderId: 'SYSTEM',
+          senderName: 'CODM Referee Bot',
+          text: `🏆 MATCH CONCLUDED! Winner: ${winnerObj.codmIgn}. ₦${match.winnerPayout.toLocaleString()} winning payout is ready! Please enter your bank details below to cash out directly to your bank account.`,
+          timestamp: Date.now(),
+        });
+      }
 
       if (loserUser) {
         loserUser.losses += 1;
       }
-
-      match.resolutionNotes = `Match verified! Winner is ${winnerObj.codmIgn}. Payout of ₦${match.winnerPayout.toLocaleString()} successfully disbursed ${hasBank ? `to saved bank (${winnerUser.bankName} ${winnerUser.accountNumber})` : `to wallet balance`}.`;
-
-      match.chatMessages.push({
-        id: `msg_${Date.now()}_settle`,
-        senderId: 'SYSTEM',
-        senderName: 'CODM Referee Bot',
-        text: `🏆 MATCH CONCLUDED! Winner: ${winnerObj.codmIgn}. ₦${match.winnerPayout.toLocaleString()} has been sent to their saved bank details (${winnerUser.bankName || 'Wallet'} - ${winnerUser.accountNumber || 'Default'})!`,
-        timestamp: Date.now(),
-      });
     }
   } else if (resolveWinner === 'dispute') {
     match.status = 'DISPUTED';

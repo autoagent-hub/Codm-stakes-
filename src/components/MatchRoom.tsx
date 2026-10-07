@@ -19,6 +19,7 @@ interface MatchRoomProps {
   onSimulateOpponentStake?: () => Promise<void>;
   onSimulateOpponentResult?: (claim: 'VICTORY' | 'DEFEAT') => Promise<void>;
   onAdminResolve?: (winnerId: string) => Promise<void>;
+  onCashOut?: (amount: number, bankDetails: { bankName: string; accountNumber: string; accountName: string }) => Promise<void>;
 }
 
 export const MatchRoom: React.FC<MatchRoomProps> = ({
@@ -33,6 +34,7 @@ export const MatchRoom: React.FC<MatchRoomProps> = ({
   onSimulateOpponentStake,
   onSimulateOpponentResult,
   onAdminResolve,
+  onCashOut,
 }) => {
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
@@ -166,7 +168,7 @@ export const MatchRoom: React.FC<MatchRoomProps> = ({
 
       {/* Settle Banner / Winner Announcement */}
       {match.status === 'SETTLED' && (
-        <div className={`p-6 rounded-2xl border shadow-2xl relative overflow-hidden text-center space-y-3 ${
+        <div className={`p-6 rounded-2xl border shadow-2xl relative overflow-hidden text-center space-y-4 ${
           isWinner
             ? 'bg-gradient-to-b from-amber-500/20 via-neutral-900 to-neutral-950 border-amber-500/50'
             : 'bg-neutral-900 border-neutral-800'
@@ -177,7 +179,7 @@ export const MatchRoom: React.FC<MatchRoomProps> = ({
 
           <h2 className="text-2xl sm:text-4xl font-black font-heading tracking-wide text-white">
             {isWinner ? (
-              <span className="text-amber-400">VICTORY! ₦{match.winnerPayout.toLocaleString()} PAID OUT</span>
+              <span className="text-amber-400">VICTORY! ₦{match.winnerPayout.toLocaleString()} WON</span>
             ) : (
               <span>MATCH CONCLUDED · WINNER: <span className="text-amber-400">{match.winnerIgn}</span></span>
             )}
@@ -194,6 +196,70 @@ export const MatchRoom: React.FC<MatchRoomProps> = ({
             <span className="text-neutral-400">·</span>
             <span className="text-emerald-400 font-bold">Winner Payout: ₦{match.winnerPayout.toLocaleString()}</span>
           </div>
+
+          {/* Direct Cash Out Form if Winner has available balance */}
+          {isWinner && currentUser.balance > 0 && (
+            <div className="p-4 rounded-xl bg-neutral-900 border border-emerald-500/40 space-y-3 text-left max-w-md mx-auto mt-3">
+              <div className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Zap className="w-4 h-4 fill-current" />
+                <span>Immediate Cash Out Winnings (Platform Holds ₦0)</span>
+              </div>
+              <p className="text-[11px] text-neutral-300">
+                Send your winnings directly to your Nigerian bank account:
+              </p>
+
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  placeholder="Bank Name (e.g. OPay, GTBank, Kuda)"
+                  defaultValue={currentUser.bankName || ''}
+                  id="roomCashOutBankName"
+                  className="w-full px-3 py-2 rounded-lg bg-neutral-950 border border-neutral-700 text-white text-xs focus:border-amber-400 focus:outline-none"
+                />
+                <input
+                  type="text"
+                  placeholder="Account Number (10 digits)"
+                  defaultValue={currentUser.accountNumber || ''}
+                  id="roomCashOutAccountNumber"
+                  className="w-full px-3 py-2 rounded-lg bg-neutral-950 border border-neutral-700 text-white text-xs font-mono-nums focus:border-amber-400 focus:outline-none"
+                />
+                <input
+                  type="text"
+                  placeholder="Account Name (e.g. John Doe)"
+                  defaultValue={currentUser.accountName || currentUser.codmIgn}
+                  id="roomCashOutAccountName"
+                  className="w-full px-3 py-2 rounded-lg bg-neutral-950 border border-neutral-700 text-white text-xs focus:border-amber-400 focus:outline-none"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  const bankName = (document.getElementById('roomCashOutBankName') as HTMLInputElement)?.value;
+                  const accountNumber = (document.getElementById('roomCashOutAccountNumber') as HTMLInputElement)?.value;
+                  const accountName = (document.getElementById('roomCashOutAccountName') as HTMLInputElement)?.value;
+
+                  if (!bankName || !accountNumber) {
+                    alert('Please enter your Bank Name and Account Number.');
+                    return;
+                  }
+
+                  if (onCashOut) {
+                    await onCashOut(currentUser.balance, {
+                      bankName,
+                      accountNumber,
+                      accountName: accountName || currentUser.codmIgn,
+                    });
+                    onRefreshMatch();
+                  }
+                }}
+                className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-neutral-950 font-black rounded-xl text-xs transition-all shadow-lg cursor-pointer uppercase flex items-center justify-center gap-1.5"
+              >
+                <Zap className="w-4 h-4 fill-current" />
+                <span>Cash Out ₦{currentUser.balance.toLocaleString()} to Bank Now</span>
+              </button>
+            </div>
+          )}
         </div>
       )}
 

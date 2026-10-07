@@ -5,7 +5,7 @@ import {
   fetchUser, fetchMatches, fetchMatch, createMatch, joinMatch,
   opponentStakeMatch, creatorStakeMatch,
   cancelMatch, submitMatchResult,
-  createUser, signUpUser, signInUser, updateUser
+  createUser, signUpUser, signInUser, updateUser, withdrawWallet
 } from './services/api';
 import { Navbar } from './components/Navbar';
 import { BottomNavbar } from './components/BottomNavbar';
@@ -268,6 +268,17 @@ function MainApp() {
     }
   };
 
+  const handleCashOut = async (amount: number, bankDetails: { bankName: string; accountNumber: string; accountName: string }) => {
+    try {
+      await withdrawWallet(currentUser.id, amount, bankDetails);
+      const updatedUser = await fetchUser(currentUser.id);
+      setCurrentUser(updatedUser);
+      alert(`Successfully cashed out ₦${amount.toLocaleString()} to ${bankDetails.bankName} (${bankDetails.accountNumber})!`);
+    } catch (err: any) {
+      alert(err.message || 'Cash out failed');
+    }
+  };
+
   const handleNavigate = (tab: string) => {
     if (tab === 'landing') navigate('/');
     else navigate(`/${tab}`);
@@ -327,6 +338,7 @@ function MainApp() {
                 onSimulateOpponentStake={handleSimulateOpponentStake}
                 onSubmitResult={handleSubmitResult}
                 onCancelMatch={handleCancelMatch}
+                onCashOut={handleCashOut}
                 onRefresh={loadData}
                 onOpenCreateBet={handleOpenCreateBet}
                 onOpenNewUserOnboarding={(targetMatch) => {
@@ -363,6 +375,7 @@ function MainApp() {
                 currentUser={currentUser}
                 matches={matches}
                 onUpdateUser={handleUpdateUser}
+                onCashOut={handleCashOut}
                 onNavigateToArena={() => navigate('/arena')}
                 onNavigateToHistory={() => navigate('/history')}
                 onNavigateToRules={() => navigate('/rules')}
@@ -384,6 +397,7 @@ function MainApp() {
                 onSimulateOpponentStake={handleSimulateOpponentStake}
                 onSubmitResult={handleSubmitResult}
                 onCancelMatch={handleCancelMatch}
+                onCashOut={handleCashOut}
                 onRefresh={loadData}
                 onOpenCreateBet={handleOpenCreateBet}
                 onOpenNewUserOnboarding={(targetMatch) => {

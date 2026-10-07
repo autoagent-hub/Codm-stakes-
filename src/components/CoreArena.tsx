@@ -24,6 +24,7 @@ interface CoreArenaProps {
   onRefresh: () => Promise<void>;
   onOpenNewUserOnboarding: (match?: Match) => void;
   onOpenCreateBet?: (mode?: string, stake?: number) => void;
+  onCashOut?: (amount: number, bankDetails: { bankName: string; accountNumber: string; accountName: string }) => Promise<void>;
 }
 
 export const CoreArena: React.FC<CoreArenaProps> = ({
@@ -40,6 +41,7 @@ export const CoreArena: React.FC<CoreArenaProps> = ({
   onRefresh,
   onOpenNewUserOnboarding,
   onOpenCreateBet,
+  onCashOut,
 }) => {
   const [selectedClaim, setSelectedClaim] = useState<'VICTORY' | 'DEFEAT' | 'DRAW'>('VICTORY');
   const [screenshotPreview, setScreenshotPreview] = useState<string | null>(null);
@@ -481,7 +483,7 @@ export const CoreArena: React.FC<CoreArenaProps> = ({
 
           {/* Settled State */}
           {myActiveMatch.status === 'SETTLED' && (
-            <div className="relative z-10 p-5 rounded-xl bg-gradient-to-b from-amber-500/15 to-neutral-950 border border-amber-500/40 text-center space-y-3">
+            <div className="relative z-10 p-5 rounded-xl bg-gradient-to-b from-amber-500/15 to-neutral-950 border border-amber-500/40 text-center space-y-4">
               <div className="w-10 h-10 rounded-full bg-amber-400/20 border border-amber-400/40 text-amber-400 flex items-center justify-center mx-auto">
                 <Trophy className="w-5 h-5" />
               </div>
@@ -496,15 +498,79 @@ export const CoreArena: React.FC<CoreArenaProps> = ({
 
               <p className="text-xs text-neutral-300 max-w-md mx-auto">
                 {myActiveMatch.winnerIgn?.includes('DRAW')
-                  ? `⚖️ Match ended in a draw. 100% of your ₦${myActiveMatch.stakeAmount.toLocaleString()} stake has been refunded to your wallet balance!`
+                  ? `⚖️ Match ended in a draw. 100% of your ₦${myActiveMatch.stakeAmount.toLocaleString()} stake has been refunded to your wallet!`
                   : myActiveMatch.winnerId === currentUser.id
-                  ? `🏆 Congratulations! ₦${myActiveMatch.winnerPayout.toLocaleString()} has been paid directly to your wallet!`
+                  ? `🏆 Congratulations! You won ₦${myActiveMatch.winnerPayout.toLocaleString()}!`
                   : `Match concluded. Winner received ₦${myActiveMatch.winnerPayout.toLocaleString()} payout.`}
               </p>
 
+              {/* Immediate Cash Out Form for Winner if balance > 0 */}
+              {myActiveMatch.winnerId === currentUser.id && currentUser.balance > 0 && (
+                <div className="p-4 rounded-xl bg-neutral-900 border border-emerald-500/40 space-y-3 text-left max-w-md mx-auto">
+                  <div className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <Zap className="w-4 h-4 fill-current" />
+                    <span>Mandatory Cash Out Winnings (Platform Holds ₦0)</span>
+                  </div>
+                  <p className="text-[11px] text-neutral-300">
+                    Winnings must be cashed out immediately to your Nigerian bank account:
+                  </p>
+
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      placeholder="Bank Name (e.g. OPay, GTBank, Kuda)"
+                      defaultValue={currentUser.bankName || ''}
+                      id="arenaCashOutBankName"
+                      className="w-full px-3 py-2 rounded-lg bg-neutral-950 border border-neutral-700 text-white text-xs focus:border-amber-400 focus:outline-none"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Account Number (10 digits)"
+                      defaultValue={currentUser.accountNumber || ''}
+                      id="arenaCashOutAccountNumber"
+                      className="w-full px-3 py-2 rounded-lg bg-neutral-950 border border-neutral-700 text-white text-xs font-mono-nums focus:border-amber-400 focus:outline-none"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Account Name (e.g. John Doe)"
+                      defaultValue={currentUser.accountName || currentUser.codmIgn}
+                      id="arenaCashOutAccountName"
+                      className="w-full px-3 py-2 rounded-lg bg-neutral-950 border border-neutral-700 text-white text-xs focus:border-amber-400 focus:outline-none"
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const bankName = (document.getElementById('arenaCashOutBankName') as HTMLInputElement)?.value;
+                      const accountNumber = (document.getElementById('arenaCashOutAccountNumber') as HTMLInputElement)?.value;
+                      const accountName = (document.getElementById('arenaCashOutAccountName') as HTMLInputElement)?.value;
+
+                      if (!bankName || !accountNumber) {
+                        alert('Please fill in your Bank Name and Account Number to cash out.');
+                        return;
+                      }
+
+                      if (onCashOut) {
+                        await onCashOut(currentUser.balance, {
+                          bankName,
+                          accountNumber,
+                          accountName: accountName || currentUser.codmIgn,
+                        });
+                        onRefresh();
+                      }
+                    }}
+                    className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-neutral-950 font-black rounded-xl text-xs transition-all shadow-lg cursor-pointer uppercase flex items-center justify-center gap-1.5"
+                  >
+                    <Zap className="w-4 h-4 fill-current" />
+                    <span>Cash Out ₦{currentUser.balance.toLocaleString()} to Bank Now</span>
+                  </button>
+                </div>
+              )}
+
               <button
                 onClick={onRefresh}
-                className="px-5 py-2.5 bg-amber-400 text-neutral-950 font-black rounded-xl text-xs hover:bg-amber-300 transition-colors cursor-pointer uppercase"
+                className="px-5 py-2.5 bg-neutral-800 text-neutral-200 hover:text-white font-bold rounded-xl text-xs hover:bg-neutral-700 transition-colors cursor-pointer uppercase"
               >
                 Return to Battle Lobby
               </button>

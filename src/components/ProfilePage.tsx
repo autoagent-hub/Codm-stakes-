@@ -11,6 +11,7 @@ interface ProfilePageProps {
   currentUser: UserProfile;
   matches: Match[];
   onUpdateUser?: (updated: Partial<UserProfile>) => Promise<void>;
+  onCashOut?: (amount: number, bankDetails: { bankName: string; accountNumber: string; accountName: string }) => Promise<void>;
   onNavigateToArena: () => void;
   onNavigateToHistory: () => void;
   onNavigateToRules: () => void;
@@ -30,6 +31,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
   currentUser,
   matches,
   onUpdateUser,
+  onCashOut,
   onNavigateToArena,
   onNavigateToHistory,
   onNavigateToRules,
@@ -191,6 +193,57 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
               <div className="h-full bg-gradient-to-r from-amber-500 to-amber-300 rounded-full w-[85%]" />
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Cash Out / Bank Payout Card */}
+      <div className="p-6 rounded-3xl bg-neutral-900 border-2 border-emerald-500/30 space-y-4 shadow-xl">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="text-xs font-mono font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+              <ShieldCheck className="w-4 h-4" />
+              <span>Available Wallet Balance for Cash Out</span>
+            </div>
+            <div className="text-3xl font-black text-white font-mono-nums">
+              ₦{currentUser.balance.toLocaleString()}
+            </div>
+            {currentUser.bankName && currentUser.accountNumber ? (
+              <p className="text-xs text-neutral-400 font-mono">
+                Saved Payout Bank: <strong className="text-neutral-200">{currentUser.bankName} ({currentUser.accountNumber} - {currentUser.accountName || currentUser.codmIgn})</strong>
+              </p>
+            ) : (
+              <p className="text-xs text-amber-400 font-mono">
+                ⚠️ No bank details saved yet. Edit profile below to save your bank details before cashing out.
+              </p>
+            )}
+          </div>
+
+          <button
+            onClick={() => {
+              if (!currentUser.bankName || !currentUser.accountNumber) {
+                setIsEditing(true);
+                alert('Please save your bank details first before cashing out.');
+                return;
+              }
+              const amountToCashOut = currentUser.balance;
+              if (amountToCashOut <= 0) {
+                alert('No available balance to cash out.');
+                return;
+              }
+              if (onCashOut) {
+                onCashOut(amountToCashOut, {
+                  bankName: currentUser.bankName,
+                  accountNumber: currentUser.accountNumber,
+                  accountName: currentUser.accountName || currentUser.codmIgn,
+                });
+              }
+            }}
+            disabled={currentUser.balance <= 0}
+            className="px-6 py-3.5 bg-emerald-500 hover:bg-emerald-400 text-neutral-950 font-black rounded-xl text-sm transition-all shadow-lg cursor-pointer uppercase flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Zap className="w-4 h-4 fill-current" />
+            <span>Cash Out ₦{currentUser.balance.toLocaleString()}</span>
+          </button>
         </div>
       </div>
 
