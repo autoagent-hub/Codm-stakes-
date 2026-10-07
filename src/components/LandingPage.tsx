@@ -52,7 +52,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
   // Filter open challenges
   const openChallenges = matches.filter(
-    (m) => m.status === 'PENDING_OPPONENT'
+    (m) => m.status === 'PENDING_OPPONENT_STAKE'
   );
 
   const toggleFaq = (idx: number) => {
@@ -522,7 +522,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-mono-nums bg-amber-500/10 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded font-bold">
-                      {match.roomCode}
+                      {match.roomCode || match.challengeCode}
                     </span>
                     <span className="text-xs font-mono-nums font-bold text-emerald-400">
                       ₦{match.stakeAmount.toLocaleString()} Stake
@@ -579,9 +579,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center font-black font-mono">
                 01
               </div>
-              <h4 className="text-base font-bold text-white">Create Wager & Lock ₦</h4>
+              <h4 className="text-base font-bold text-white">Generate Bet Link (₦0 Upfront)</h4>
               <p className="text-xs text-neutral-400 leading-relaxed">
-                Create a ₦1,000+ bet. The stake is held in escrow. System automatically generates your Game Room Code (e.g. <code>CODM-8291-SHP</code>).
+                Set your stake amount (₦1,000+), game mode, and map. Creating your challenge link is free with zero balance held upfront.
               </p>
             </div>
 
@@ -589,9 +589,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <div className="w-10 h-10 rounded-xl bg-neutral-800 text-neutral-200 flex items-center justify-center font-black font-mono">
                 02
               </div>
-              <h4 className="text-base font-bold text-white">Opponent Accepts & Locks</h4>
+              <h4 className="text-base font-bold text-white">Opponent Accepts & Stakes</h4>
               <p className="text-xs text-neutral-400 leading-relaxed">
-                Send the invite link to your opponent. If they are new, they quickly sign up with their CODM gamer tag to enter the match room.
+                Send the challenge link. Your opponent accepts the duel by depositing their stake into escrow to lock their commitment.
               </p>
             </div>
 
@@ -599,9 +599,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <div className="w-10 h-10 rounded-xl bg-neutral-800 text-neutral-200 flex items-center justify-center font-black font-mono">
                 03
               </div>
-              <h4 className="text-base font-bold text-white">Battle in CODM</h4>
+              <h4 className="text-base font-bold text-white">Host Stakes ➔ Room # Generated</h4>
               <p className="text-xs text-neutral-400 leading-relaxed">
-                Open Call of Duty: Mobile, enter Private Match, invite your opponent, and battle it out according to agreed rules.
+                You send your matching stake into escrow. Once confirmed, the system immediately generates your official in-game CODM Room Number!
               </p>
             </div>
 
@@ -609,9 +609,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-black font-mono">
                 04
               </div>
-              <h4 className="text-base font-bold text-emerald-400">Scoreboard AI ➔ Payout</h4>
+              <h4 className="text-base font-bold text-emerald-400">Battle & AI Escrow Payout</h4>
               <p className="text-xs text-neutral-300 leading-relaxed">
-                Submit your post-game scoreboard screenshot. The referee engine verifies it and pays out <strong>90% of the pot</strong> directly to the winner's wallet!
+                Join private match in CODM. Upload victory scoreboard screenshot for automated referee verification & instant payout!
               </p>
             </div>
           </div>

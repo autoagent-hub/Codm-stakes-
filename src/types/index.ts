@@ -55,7 +55,8 @@ export interface ChatMessage {
 
 export interface Match {
   id: string;
-  roomCode: string;
+  challengeCode: string;
+  roomCode?: string; // Generated ONLY when both players have confirmed their stake payments
   gameMode: string;
   map: string;
   rules: string[];
@@ -64,8 +65,18 @@ export interface Match {
   platformFeePercentage: number;
   platformFee: number;
   winnerPayout: number;
-  status: 'PENDING_OPPONENT' | 'READY_TO_PLAY' | 'IN_PROGRESS' | 'SUBMITTING_RESULTS' | 'VERIFYING' | 'SETTLED' | 'DISPUTED' | 'CANCELLED';
+  status:
+    | 'PENDING_OPPONENT_STAKE'
+    | 'OPPONENT_STAKED_AWAITING_CREATOR'
+    | 'READY_TO_PLAY'
+    | 'IN_PROGRESS'
+    | 'SUBMITTING_RESULTS'
+    | 'VERIFYING'
+    | 'SETTLED'
+    | 'DISPUTED'
+    | 'CANCELLED';
   createdAt: number;
+  roomGeneratedAt?: number;
   creator: MatchPlayer;
   opponent?: MatchPlayer;
   winnerId?: string;

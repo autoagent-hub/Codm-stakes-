@@ -269,6 +269,38 @@ export async function joinMatch(matchId: string, opponentId: string): Promise<Ma
   return await res.json();
 }
 
+export async function opponentStakeMatch(
+  matchId: string,
+  payload: { opponentId: string; paymentMethod?: string }
+): Promise<Match> {
+  const res = await fetch(`/api/matches/${matchId}/opponent-stake`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error || 'Failed to lock opponent stake in escrow');
+  }
+  return await res.json();
+}
+
+export async function creatorStakeMatch(
+  matchId: string,
+  payload: { creatorId: string; paymentMethod?: string }
+): Promise<Match> {
+  const res = await fetch(`/api/matches/${matchId}/creator-stake`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error || 'Failed to lock matching host stake in escrow');
+  }
+  return await res.json();
+}
+
 export async function sendMatchChat(matchId: string, senderId: string, text: string) {
   const res = await fetch(`/api/matches/${matchId}/chat`, {
     method: 'POST',
@@ -307,6 +339,20 @@ export async function submitMatchResult(matchId: string, payload: {
     throw new Error(err.error || 'Failed to submit match screenshot');
   }
   return await res.json();
+}
+
+export async function updateUser(userId: string, data: Partial<UserProfile>): Promise<UserProfile> {
+  try {
+    const res = await fetch(`/api/users/${userId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (res.ok) return await res.json();
+  } catch (e) {
+    console.error('Failed to update user via API:', e);
+  }
+  return { ...DEFAULT_USERS[userId], ...data } as UserProfile;
 }
 
 export async function adminResolveMatch(matchId: string, winnerId: string): Promise<Match> {

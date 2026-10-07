@@ -1,9 +1,9 @@
 import React from 'react';
 import { UserProfile } from '../types';
-import { Wallet, Swords, ArrowDownLeft, Plus, Target, LogOut, Clock, User } from 'lucide-react';
+import { Swords, Plus, Target, LogOut, Clock, User, Trophy, BookOpen, ShieldCheck } from 'lucide-react';
 import { CODM_IMAGES } from '../assets/images';
 
-export type NavigationTab = 'landing' | 'auth' | 'arena' | 'history' | 'wallet_dashboard' | 'funding' | 'profile' | 'active_bets';
+export type NavigationTab = 'landing' | 'auth' | 'arena' | 'leaderboard' | 'rules' | 'history' | 'profile';
 
 interface NavbarProps {
   currentUser: UserProfile;
@@ -46,15 +46,36 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
         </div>
 
-        {/* Zone 2: Clean text navigation links */}
+        {/* Zone 2: Separate Tab Navigation Links */}
         <nav className="hidden md:flex items-center gap-5 lg:gap-6 text-sm font-medium">
           <button
             onClick={() => setCurrentTab('arena')}
-            className={`transition-colors whitespace-nowrap cursor-pointer ${
+            className={`transition-colors whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
               currentTab === 'arena' ? 'text-amber-400 font-bold' : 'text-neutral-400 hover:text-neutral-200'
             }`}
           >
-            Dashboard
+            <Swords className="w-3.5 h-3.5" />
+            <span>Arena</span>
+          </button>
+
+          <button
+            onClick={() => setCurrentTab('leaderboard')}
+            className={`transition-colors whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+              currentTab === 'leaderboard' ? 'text-amber-400 font-bold' : 'text-neutral-400 hover:text-neutral-200'
+            }`}
+          >
+            <Trophy className="w-3.5 h-3.5" />
+            <span>Leaderboard</span>
+          </button>
+
+          <button
+            onClick={() => setCurrentTab('rules')}
+            className={`transition-colors whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+              currentTab === 'rules' ? 'text-amber-400 font-bold' : 'text-neutral-400 hover:text-neutral-200'
+            }`}
+          >
+            <ShieldCheck className="w-3.5 h-3.5" />
+            <span>Rules</span>
           </button>
 
           <button
@@ -68,15 +89,6 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
 
           <button
-            onClick={() => setCurrentTab('wallet_dashboard')}
-            className={`transition-colors whitespace-nowrap cursor-pointer ${
-              currentTab === 'wallet_dashboard' ? 'text-amber-400 font-bold' : 'text-neutral-400 hover:text-neutral-200'
-            }`}
-          >
-            Wallet
-          </button>
-
-          <button
             onClick={() => setCurrentTab('profile')}
             className={`transition-colors whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
               currentTab === 'profile' ? 'text-amber-400 font-bold' : 'text-neutral-400 hover:text-neutral-200'
@@ -85,16 +97,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             <User className="w-3.5 h-3.5" />
             <span>Profile</span>
           </button>
-
-          <button
-            onClick={() => setCurrentTab('funding')}
-            className={`transition-colors whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
-              currentTab === 'funding' ? 'text-emerald-400 font-bold' : 'text-neutral-400 hover:text-emerald-300'
-            }`}
-          >
-            <ArrowDownLeft className="w-3.5 h-3.5" />
-            <span>Fund ₦</span>
-          </button>
         </nav>
 
         {/* Zone 3: Primary Actions & User HUD */}
@@ -102,26 +104,11 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Create Bet Button */}
           <button
             onClick={openCreateBetModal}
-            className="flex items-center gap-1.5 px-3 sm:px-3.5 py-2 text-xs sm:text-sm font-black text-neutral-950 bg-amber-400 hover:bg-amber-300 rounded-xl shadow-md transition-all active:scale-95 whitespace-nowrap cursor-pointer"
+            className="flex items-center gap-1.5 px-3 sm:px-4 py-2 text-xs sm:text-sm font-black text-neutral-950 bg-amber-400 hover:bg-amber-300 rounded-xl shadow-md transition-all active:scale-95 whitespace-nowrap cursor-pointer uppercase"
           >
             <Plus className="w-4 h-4 stroke-[3]" />
             <span className="hidden xs:inline">Create Bet</span>
             <span className="xs:hidden">Bet</span>
-          </button>
-
-          {/* Available Balance Shortcut */}
-          <button
-            onClick={() => setCurrentTab('wallet_dashboard')}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-neutral-900 border border-neutral-800 hover:border-emerald-500/50 transition-colors text-left group cursor-pointer"
-            title="Open Wallet Dashboard"
-          >
-            <Wallet className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform" />
-            <div className="flex flex-col">
-              <span className="text-[10px] text-neutral-400 font-mono-nums uppercase leading-none">Balance</span>
-              <span className="text-xs sm:text-sm font-black text-emerald-400 font-mono-nums">
-                ₦{currentUser.balance.toLocaleString()}
-              </span>
-            </div>
           </button>
 
           {/* User Profile Badge (Clickable to open profile) */}
@@ -151,46 +138,12 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               onClick={onSignOut}
               className="p-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 hover:border-rose-500/50 text-neutral-400 hover:text-rose-400 transition-colors cursor-pointer"
-              title="Sign Out to Sign In / Landing Page"
+              title="Sign Out"
             >
               <LogOut className="w-4 h-4" />
             </button>
           )}
         </div>
-      </div>
-
-      {/* Mobile Nav strip */}
-      <div className="md:hidden flex items-center justify-around border-t border-neutral-900 bg-neutral-950 px-2 py-2 text-xs">
-        <button
-          onClick={() => setCurrentTab('arena')}
-          className={`py-1 px-2.5 rounded-lg ${currentTab === 'arena' ? 'bg-amber-500/20 text-amber-400 font-bold border border-amber-500/30' : 'text-neutral-400'}`}
-        >
-          Dashboard
-        </button>
-        <button
-          onClick={() => setCurrentTab('history')}
-          className={`py-1 px-2.5 rounded-lg ${currentTab === 'history' ? 'bg-amber-500/20 text-amber-400 font-bold border border-amber-500/30' : 'text-neutral-400'}`}
-        >
-          History
-        </button>
-        <button
-          onClick={() => setCurrentTab('wallet_dashboard')}
-          className={`py-1 px-2.5 rounded-lg ${currentTab === 'wallet_dashboard' ? 'bg-amber-500/20 text-amber-400 font-bold border border-amber-500/30' : 'text-neutral-400'}`}
-        >
-          Wallet
-        </button>
-        <button
-          onClick={() => setCurrentTab('profile')}
-          className={`py-1 px-2.5 rounded-lg ${currentTab === 'profile' ? 'bg-amber-500/20 text-amber-400 font-bold border border-amber-500/30' : 'text-neutral-400'}`}
-        >
-          Profile
-        </button>
-        <button
-          onClick={() => setCurrentTab('funding')}
-          className={`py-1 px-2.5 rounded-lg ${currentTab === 'funding' ? 'bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30' : 'text-neutral-400'}`}
-        >
-          Fund ₦
-        </button>
       </div>
     </header>
   );

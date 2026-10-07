@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { UserProfile, Match } from '../types';
 import {
-  User, Trophy, Award, TrendingUp, ShieldCheck, Wallet, Swords,
+  User, Trophy, Award, TrendingUp, ShieldCheck, Swords,
   Edit3, Check, Copy, ArrowRight, Shield, Zap, Flame, Clock,
-  Calendar, CheckCircle2, AlertCircle, Camera, Crosshair, Users, LogOut
+  Calendar, CheckCircle2, AlertCircle, Camera, Crosshair, Users, LogOut, BookOpen
 } from 'lucide-react';
 import { CODM_IMAGES } from '../assets/images';
 
@@ -11,9 +11,10 @@ interface ProfilePageProps {
   currentUser: UserProfile;
   matches: Match[];
   onUpdateUser?: (updated: Partial<UserProfile>) => Promise<void>;
-  onNavigateToWallet: () => void;
+  onNavigateToArena: () => void;
   onNavigateToHistory: () => void;
-  onNavigateToFunding: () => void;
+  onNavigateToLeaderboard: () => void;
+  onNavigateToRules: () => void;
   onOpenCreateBet: (mode?: string, stake?: number) => void;
   onSignOut?: () => void;
 }
@@ -30,9 +31,10 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
   currentUser,
   matches,
   onUpdateUser,
-  onNavigateToWallet,
+  onNavigateToArena,
   onNavigateToHistory,
-  onNavigateToFunding,
+  onNavigateToLeaderboard,
+  onNavigateToRules,
   onOpenCreateBet,
   onSignOut,
 }) => {
@@ -53,7 +55,6 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
   const userMatches = matches.filter(
     (m) => m.creator.id === currentUser.id || m.opponent?.id === currentUser.id
   );
-  const completedMatches = userMatches.filter((m) => m.status === 'SETTLED');
 
   const handleCopyUid = () => {
     navigator.clipboard.writeText(currentUser.codmUid);
@@ -136,11 +137,11 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                 <div className="flex flex-wrap items-center gap-3 pt-1 text-xs sm:text-sm">
                   <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-bold font-mono-nums">
                     <Trophy className="w-4 h-4" />
-                    <span>{currentUser.wins}W - {currentUser.losses}L{currentUser.draws ? ` - ${currentUser.draws}D` : ''} ({winRate}% Win Rate)</span>
+                    <span>{currentUser.wins}W - {currentUser.losses}L ({winRate}% Win Rate)</span>
                   </div>
                   <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 font-bold font-mono-nums">
                     <TrendingUp className="w-4 h-4" />
-                    <span>Winnings: ₦{currentUser.totalWinnings.toLocaleString()}</span>
+                    <span>Escrow Winnings: ₦{currentUser.totalWinnings.toLocaleString()}</span>
                   </div>
                 </div>
               </div>
@@ -157,11 +158,11 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
               </button>
 
               <button
-                onClick={onNavigateToFunding}
+                onClick={() => onOpenCreateBet('1v1 Sniper Only', 1000)}
                 className="px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-neutral-950 text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-2 uppercase tracking-wide shadow-md"
               >
-                <Wallet className="w-3.5 h-3.5" />
-                <span>Fund Wallet (₦)</span>
+                <Swords className="w-3.5 h-3.5" />
+                <span>Create 1v1 Bet</span>
               </button>
 
               {onSignOut && (
@@ -180,7 +181,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
           <div className="p-4 rounded-2xl bg-neutral-950/80 border border-neutral-800 space-y-2">
             <div className="flex items-center justify-between text-xs font-mono">
               <span className="text-neutral-400 font-bold">LEGENDARY RANK PROGRESSION (8,420 XP)</span>
-              <span className="text-amber-400 font-black">TOP 1% GLOBAL PLAYERS</span>
+              <span className="text-amber-400 font-black">TOP 1% NIGERIAN PLAYERS</span>
             </div>
             <div className="w-full h-2.5 rounded-full bg-neutral-900 overflow-hidden border border-neutral-800">
               <div className="h-full bg-gradient-to-r from-amber-500 to-amber-300 rounded-full w-[85%]" />
@@ -197,7 +198,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
       )}
 
       {/* ------------------------------------------------------------- */}
-      {/* 2. EDIT PROFILE FORM (MODAL / TOGGLE)                          */}
+      {/* 2. EDIT PROFILE FORM (TOGGLE)                                  */}
       {/* ------------------------------------------------------------- */}
       {isEditing && (
         <div className="p-6 sm:p-8 rounded-3xl bg-neutral-900 border border-neutral-800 space-y-6 shadow-2xl">
@@ -279,7 +280,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
 
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-neutral-300 uppercase tracking-wider block font-mono">
-                  Phone Number (Naira SMS Alerts)
+                  Phone Number (SMS Match Alerts)
                 </label>
                 <input
                   type="text"
@@ -310,13 +311,13 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
       )}
 
       {/* ------------------------------------------------------------- */}
-      {/* 3. LIFETIME COMBAT & ESCROW ANALYTICS                         */}
+      {/* 3. LIFETIME COMBAT ANALYTICS                                  */}
       {/* ------------------------------------------------------------- */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div className="p-5 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-1">
           <div className="text-[10px] text-neutral-400 font-mono uppercase">Total Matches</div>
           <div className="text-2xl font-black text-white font-mono-nums">{currentUser.wins + currentUser.losses}</div>
-          <div className="text-[10px] text-neutral-500 font-mono">Duel & Squad</div>
+          <div className="text-[10px] text-neutral-500 font-mono">1v1 & Squad Duels</div>
         </div>
 
         <div className="p-5 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-1">
@@ -328,56 +329,61 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
         <div className="p-5 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-1">
           <div className="text-[10px] text-neutral-400 font-mono uppercase">Total Winnings</div>
           <div className="text-2xl font-black text-amber-400 font-mono-nums">₦{currentUser.totalWinnings.toLocaleString()}</div>
-          <div className="text-[10px] text-amber-400/80 font-mono">Naira Payouts</div>
+          <div className="text-[10px] text-amber-400/80 font-mono">Escrow Payouts</div>
         </div>
 
         <div className="p-5 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-1">
-          <div className="text-[10px] text-neutral-400 font-mono uppercase">Wallet Balance</div>
-          <div className="text-2xl font-black text-emerald-400 font-mono-nums">₦{currentUser.balance.toLocaleString()}</div>
-          <div className="text-[10px] text-neutral-500 font-mono">Available Escrow</div>
+          <div className="text-[10px] text-neutral-400 font-mono uppercase">Defeats</div>
+          <div className="text-2xl font-black text-rose-400 font-mono-nums">{currentUser.losses}</div>
+          <div className="text-[10px] text-neutral-500 font-mono">Settled Losses</div>
         </div>
       </div>
 
       {/* ------------------------------------------------------------- */}
-      {/* 4. QUICK NAVIGATION CARDS (WALLET & HISTORY)                  */}
+      {/* 4. DEDICATED SEPARATE TAB LINKS                               */}
       {/* ------------------------------------------------------------- */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div
-          onClick={onNavigateToHistory}
-          className="p-6 rounded-2xl bg-neutral-900 border border-neutral-800 hover:border-amber-400/60 transition-all cursor-pointer group space-y-3"
+          onClick={onNavigateToArena}
+          className="p-5 rounded-2xl bg-neutral-900 border border-neutral-800 hover:border-amber-400/60 transition-all cursor-pointer group space-y-2.5"
         >
-          <div className="flex items-center justify-between">
-            <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center font-bold">
-              <Clock className="w-5 h-5" />
-            </div>
-            <span className="text-xs text-amber-400 font-bold group-hover:translate-x-1 transition-transform">
-              View History →
-            </span>
+          <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center font-bold">
+            <Swords className="w-5 h-5" />
           </div>
           <div>
-            <h4 className="font-heading font-black text-base text-white uppercase">Match History & Ledger</h4>
-            <p className="text-xs text-neutral-400 mt-1">
-              Review all past duels, scoreboard proofs, outcome claims, and victory payouts.
+            <h4 className="font-heading font-black text-sm text-white uppercase">Arena & Challenges</h4>
+            <p className="text-xs text-neutral-400 mt-0.5">
+              Create custom wagers, jump into active battles, and share challenge links.
             </p>
           </div>
         </div>
 
         <div
-          onClick={onNavigateToWallet}
-          className="p-6 rounded-2xl bg-neutral-900 border border-neutral-800 hover:border-emerald-400/60 transition-all cursor-pointer group space-y-3"
+          onClick={onNavigateToLeaderboard}
+          className="p-5 rounded-2xl bg-neutral-900 border border-neutral-800 hover:border-amber-400/60 transition-all cursor-pointer group space-y-2.5"
         >
-          <div className="flex items-center justify-between">
-            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center font-bold">
-              <Wallet className="w-5 h-5" />
-            </div>
-            <span className="text-xs text-emerald-400 font-bold group-hover:translate-x-1 transition-transform">
-              Open Wallet →
-            </span>
+          <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center font-bold">
+            <Trophy className="w-5 h-5" />
           </div>
           <div>
-            <h4 className="font-heading font-black text-base text-white uppercase">Escrow Wallet & Cashout</h4>
-            <p className="text-xs text-neutral-400 mt-1">
-              Deposit Nigerian Naira (₦) or withdraw instant earnings to any commercial bank.
+            <h4 className="font-heading font-black text-sm text-white uppercase">Leaderboard Rankings</h4>
+            <p className="text-xs text-neutral-400 mt-0.5">
+              View the top gladiators in Nigeria, win streaks, and rank tiers.
+            </p>
+          </div>
+        </div>
+
+        <div
+          onClick={onNavigateToHistory}
+          className="p-5 rounded-2xl bg-neutral-900 border border-neutral-800 hover:border-emerald-400/60 transition-all cursor-pointer group space-y-2.5"
+        >
+          <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center font-bold">
+            <Clock className="w-5 h-5" />
+          </div>
+          <div>
+            <h4 className="font-heading font-black text-sm text-white uppercase">Match History</h4>
+            <p className="text-xs text-neutral-400 mt-0.5">
+              Review completed battles, screenshots, and victory payouts.
             </p>
           </div>
         </div>

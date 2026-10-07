@@ -19,7 +19,7 @@ interface CreateBetModalProps {
     map: string;
     rules: string[];
   }) => Promise<void>;
-  onOpenWallet: () => void;
+  onOpenWallet?: () => void;
 }
 
 export const CreateBetModal: React.FC<CreateBetModalProps> = ({
@@ -58,7 +58,6 @@ export const CreateBetModal: React.FC<CreateBetModalProps> = ({
   const parsedStake = parseInt(stakeInput, 10);
   const stakeAmount = isNaN(parsedStake) ? 0 : parsedStake;
   const { potAmount, rakePercentFormatted, platformFee, winnerPayout } = calculateMatchEconomics(Math.max(0, stakeAmount));
-  const isInsufficient = currentUser.balance < stakeAmount;
 
   const handleCreate = async () => {
     if (!stakeInput.trim() || isNaN(parsedStake) || parsedStake < 1000) {
@@ -71,10 +70,6 @@ export const CreateBetModal: React.FC<CreateBetModalProps> = ({
     }
     if (!mapInput.trim()) {
       setError('Please enter a map name');
-      return;
-    }
-    if (isInsufficient) {
-      setError(`Insufficient balance. You have ₦${currentUser.balance.toLocaleString()}. Please fund your wallet first.`);
       return;
     }
 
@@ -93,7 +88,7 @@ export const CreateBetModal: React.FC<CreateBetModalProps> = ({
       });
       onClose();
     } catch (err: any) {
-      setError(err.message || 'Failed to create bet');
+      setError(err.message || 'Failed to generate bet link');
     } finally {
       setLoading(false);
     }
@@ -275,8 +270,8 @@ export const CreateBetModal: React.FC<CreateBetModalProps> = ({
               <label className="text-xs font-bold text-neutral-300 uppercase tracking-wider">
                 Stake Amount (₦ Naira)
               </label>
-              <span className="text-xs text-neutral-400 font-mono-nums">
-                Available: <span className="text-emerald-400 font-bold">₦{currentUser.balance.toLocaleString()}</span>
+              <span className="text-xs text-amber-400 font-bold flex items-center gap-1">
+                <span>₦0 Upfront to Generate Link</span>
               </span>
             </div>
 
@@ -316,16 +311,6 @@ export const CreateBetModal: React.FC<CreateBetModalProps> = ({
                   placeholder="Enter custom stake (e.g. 1500, 3000, 7500)"
                   className="w-full pl-8 pr-24 py-2.5 rounded-xl bg-neutral-950 border border-neutral-700 text-white font-mono-nums font-bold text-sm focus:outline-none focus:border-amber-400"
                 />
-                <button
-                  type="button"
-                  onClick={() => {
-                    setStakeInput(currentUser.balance.toString());
-                    setError(null);
-                  }}
-                  className="absolute right-2 top-1.5 px-2.5 py-1 text-[10px] font-bold uppercase rounded-lg bg-neutral-800 text-amber-400 hover:bg-neutral-700 transition-colors cursor-pointer"
-                >
-                  Max
-                </button>
               </div>
 
               {/* Quick Increments */}
@@ -366,21 +351,18 @@ export const CreateBetModal: React.FC<CreateBetModalProps> = ({
             </div>
           </div>
 
-          {isInsufficient && (
-            <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between text-xs">
-              <span className="text-amber-300 font-medium">Insufficient balance for ₦{stakeAmount.toLocaleString()} stake</span>
-              <button
-                type="button"
-                onClick={() => {
-                  onClose();
-                  onOpenWallet();
-                }}
-                className="px-3 py-1.5 bg-amber-400 text-neutral-950 font-bold rounded-lg cursor-pointer hover:bg-amber-300 transition-colors"
-              >
-                Fund Wallet Now
-              </button>
+          {/* On-Demand Escrow Process Note */}
+          <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-neutral-300 flex items-start gap-2.5 leading-relaxed">
+            <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+            <div>
+              <strong className="text-amber-300">How Escrow Staking Works:</strong>
+              <div className="text-[11px] text-neutral-400 mt-0.5">
+                1. Generating this bet link is free (₦0 deducted now).<br />
+                2. Your opponent accepts and deposits their ₦{stakeAmount.toLocaleString()} stake to confirm the challenge.<br />
+                3. You will then send your matching ₦{stakeAmount.toLocaleString()} stake to unlock your in-game CODM room number.
+              </div>
             </div>
-          )}
+          </div>
         </div>
 
         {/* Footer */}
@@ -400,11 +382,11 @@ export const CreateBetModal: React.FC<CreateBetModalProps> = ({
             className="px-6 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-neutral-950 text-xs font-black shadow-lg transition-all hover:scale-105 active:scale-95 cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
           >
             {loading ? (
-              <span>Locking Escrow...</span>
+              <span>Generating Bet Link...</span>
             ) : (
               <>
                 <Swords className="w-4 h-4 stroke-[2.5]" />
-                <span>Create Wager & Lock ₦{stakeAmount.toLocaleString()}</span>
+                <span>Generate Bet Link (₦{stakeAmount.toLocaleString()} Stake)</span>
               </>
             )}
           </button>

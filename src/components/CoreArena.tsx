@@ -5,18 +5,22 @@ import {
   ArrowRight, AlertCircle, CheckCircle2, MessageCircle, Wallet,
   UserCheck, RefreshCw, Sparkles, Crosshair, Target, X, Plus,
   Flame, Zap, Users, Flag, Shield, Sliders, ChevronRight, Gamepad2, MapPin,
-  TrendingUp, Award, Clock
+  TrendingUp, Award, Clock, Lock
 } from 'lucide-react';
 import { CODM_IMAGES } from '../assets/images';
+import { StakePaymentModal } from './StakePaymentModal';
 
 interface CoreArenaProps {
   currentUser: UserProfile;
   matches: Match[];
   onCreateBet: (data: { stakeAmount: number; gameMode: string; map: string; rules: string[] }) => Promise<void>;
   onJoinMatch: (matchId: string, opponentId: string) => Promise<void>;
+  onOpponentStake?: (matchId: string, paymentMethod: 'bank_transfer' | 'opay_palmpay' | 'card' | 'wallet_balance') => Promise<void>;
+  onCreatorStake?: (matchId: string, paymentMethod: 'bank_transfer' | 'opay_palmpay' | 'card' | 'wallet_balance') => Promise<void>;
+  onSimulateOpponentStake?: (matchId: string) => Promise<void>;
   onSubmitResult: (matchId: string, claim: 'VICTORY' | 'DEFEAT' | 'DRAW', screenshotBase64?: string) => Promise<void>;
   onCancelMatch: (matchId: string) => Promise<void>;
-  onOpenWallet: () => void;
+  onOpenWallet?: () => void;
   onRefresh: () => Promise<void>;
   onOpenNewUserOnboarding: (match?: Match) => void;
   onOpenCreateBet?: (mode?: string, stake?: number) => void;
@@ -27,6 +31,9 @@ export const CoreArena: React.FC<CoreArenaProps> = ({
   matches,
   onCreateBet,
   onJoinMatch,
+  onOpponentStake,
+  onCreatorStake,
+  onSimulateOpponentStake,
   onSubmitResult,
   onCancelMatch,
   onOpenWallet,
@@ -34,13 +41,17 @@ export const CoreArena: React.FC<CoreArenaProps> = ({
   onOpenNewUserOnboarding,
   onOpenCreateBet,
 }) => {
-  // Result submission state: supports VICTORY, DEFEAT, and DRAW
   const [selectedClaim, setSelectedClaim] = useState<'VICTORY' | 'DEFEAT' | 'DRAW'>('VICTORY');
   const [screenshotPreview, setScreenshotPreview] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+
+  // Staking Modal state
+  const [stakeTargetMatch, setStakeTargetMatch] = useState<Match | null>(null);
+  const [stakeRole, setStakeRole] = useState<'opponent' | 'creator'>('opponent');
+  const [isStakeModalOpen, setIsStakeModalOpen] = useState(false);
 
   // Find active match where currentUser is a participant (creator or opponent)
   const myActiveMatch = matches.find(
@@ -51,8 +62,10 @@ export const CoreArena: React.FC<CoreArenaProps> = ({
 
   // Open matches created by others that currentUser can join
   const openChallenges = matches.filter(
-    (m) => m.status === 'PENDING_OPPONENT' && m.creator.id !== currentUser.id
+    (m) => m.status === 'PENDING_OPPONENT_STAKE' && m.creator.id !== currentUser.id
   );
+
+  const isCreatorOfActive = myActiveMatch?.creator.id === currentUser.id;
 
   const copyCode = (code: string) => {
     navigator.clipboard.writeText(code);
@@ -95,10 +108,15 @@ export const CoreArena: React.FC<CoreArenaProps> = ({
     }
   };
 
-  const winRate =
-    currentUser.wins + currentUser.losses > 0
-      ? Math.round((currentUser.wins / (currentUser.wins + currentUser.losses)) * 100)
-      : 0;
+  const handleConfirmStake = async (method: 'bank_transfer' | 'opay_palmpay' | 'card' | 'wallet_balance') => {
+    if (!stakeTargetMatch) return;
+    if (stakeRole === 'opponent' && onOpponentStake) {
+      await onOpponentStake(stakeTargetMatch.id, method);
+    } else if (stakeRole === 'creator' && onCreatorStake) {
+      await onCreatorStake(stakeTargetMatch.id, method);
+    }
+    await onRefresh();
+  };
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 pb-16">
@@ -127,7 +145,7 @@ export const CoreArena: React.FC<CoreArenaProps> = ({
             <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-500/15 border border-amber-500/30 text-amber-400 text-xs font-mono font-bold">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span>ACTIVE MATCH</span>
+                <span>{myActiveMatch.status.replace(/_/g, ' ')}</span>
               </div>
               <span className="text-xs font-bold text-white font-heading tracking-wide">
                 {myActiveMatch.gameMode}
@@ -138,14 +156,18 @@ export const CoreArena: React.FC<CoreArenaProps> = ({
             </div>
 
             <div className="flex items-center gap-2">
-              {/* Room Code Pill */}
+              {/* Room Code or Challenge Code Pill */}
               <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-neutral-950/90 border border-neutral-800">
-                <span className="text-[10px] text-neutral-400 font-mono">ROOM:</span>
-                <span className="text-xs sm:text-sm font-black font-mono-nums text-amber-400">{myActiveMatch.roomCode}</span>
+                <span className="text-[10px] text-neutral-400 font-mono">
+                  {myActiveMatch.roomCode ? 'ROOM:' : 'CHALLENGE:'}
+                </span>
+                <span className="text-xs sm:text-sm font-black font-mono-nums text-amber-400">
+                  {myActiveMatch.roomCode || myActiveMatch.challengeCode}
+                </span>
                 <button
-                  onClick={() => copyCode(myActiveMatch.roomCode)}
+                  onClick={() => copyCode(myActiveMatch.roomCode || myActiveMatch.challengeCode)}
                   className="text-neutral-400 hover:text-white transition-colors ml-1 p-0.5 cursor-pointer"
-                  title="Copy room code"
+                  title="Copy code"
                 >
                   {copiedCode ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                 </button>
@@ -158,13 +180,17 @@ export const CoreArena: React.FC<CoreArenaProps> = ({
             </div>
           </div>
 
-          {/* Waiting for opponent state */}
-          {myActiveMatch.status === 'PENDING_OPPONENT' && (
+          {/* STEP 1: Waiting for opponent to accept & stake */}
+          {myActiveMatch.status === 'PENDING_OPPONENT_STAKE' && (
             <div className="relative z-10 space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs">
                 <div className="flex items-center gap-2 text-amber-400 font-bold">
-                  <ShieldCheck className="w-4 h-4 shrink-0" />
-                  <span>₦{myActiveMatch.stakeAmount.toLocaleString()} Escrowed · Waiting for Opponent to Join</span>
+                  <Clock className="w-4 h-4 shrink-0 animate-pulse" />
+                  <span>
+                    {isCreatorOfActive
+                      ? `Challenge Created (₦0 Upfront) · Awaiting Opponent to Stake ₦${myActiveMatch.stakeAmount.toLocaleString()}`
+                      : `Challenged to ₦${myActiveMatch.stakeAmount.toLocaleString()} Duel!`}
+                  </span>
                 </div>
                 <div className="text-[11px] text-neutral-400 font-mono-nums">
                   Winner Payout: <strong className="text-emerald-400">₦{myActiveMatch.winnerPayout.toLocaleString()}</strong>
@@ -174,7 +200,7 @@ export const CoreArena: React.FC<CoreArenaProps> = ({
               {/* Invite Link & WhatsApp Share */}
               <div className="p-4 rounded-xl bg-neutral-950/90 border border-neutral-800/90 space-y-2.5">
                 <label className="text-[11px] font-bold text-neutral-300 uppercase tracking-wider block font-mono">
-                  Challenge Invite Link
+                  Share Challenge Link With Opponent
                 </label>
                 <div className="flex flex-col sm:flex-row items-center gap-2">
                   <input
@@ -189,11 +215,11 @@ export const CoreArena: React.FC<CoreArenaProps> = ({
                       className="flex-1 sm:flex-none px-4 py-2.5 bg-amber-400 hover:bg-amber-300 text-neutral-950 font-black text-xs rounded-lg transition-all cursor-pointer whitespace-nowrap flex items-center justify-center gap-1.5 uppercase"
                     >
                       {copiedLink ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                      <span>{copiedLink ? 'Copied' : 'Copy'}</span>
+                      <span>{copiedLink ? 'Copied' : 'Copy Link'}</span>
                     </button>
 
                     <a
-                      href={`https://wa.me/?text=${encodeURIComponent(`⚔️ CODM STAKE 1V1 CHALLENGE!\nI staked ₦${myActiveMatch.stakeAmount.toLocaleString()} in CODM.\nCustom Room Code: ${myActiveMatch.roomCode}\nAccept & lock in the ₦${myActiveMatch.potAmount.toLocaleString()} pot here: ${window.location.origin}/?join=${myActiveMatch.id}`)}`}
+                      href={`https://wa.me/?text=${encodeURIComponent(`⚔️ CODM STAKE 1V1 CHALLENGE!\nI created a ₦${myActiveMatch.stakeAmount.toLocaleString()} challenge in CODM (${myActiveMatch.gameMode} on ${myActiveMatch.map}).\nAccept & send your stake to unlock the room: ${window.location.origin}/?join=${myActiveMatch.id}`)}`}
                       target="_blank"
                       rel="noreferrer"
                       className="flex-1 sm:flex-none py-2.5 px-3.5 rounded-lg bg-emerald-600/20 border border-emerald-500/40 hover:bg-emerald-600/30 text-emerald-400 text-xs font-bold transition-colors text-center flex items-center justify-center gap-1.5 whitespace-nowrap"
@@ -203,52 +229,139 @@ export const CoreArena: React.FC<CoreArenaProps> = ({
                     </a>
                   </div>
                 </div>
+                <p className="text-[11px] text-neutral-400">
+                  When your opponent clicks this link and deposits their ₦{myActiveMatch.stakeAmount.toLocaleString()} stake, you will be prompted to send your matching stake and the system will immediately generate the CODM in-game room number.
+                </p>
               </div>
 
               {/* Action row: Simulate & Cancel */}
               <div className="flex flex-wrap items-center justify-between gap-3 pt-1 text-xs">
-                <button
-                  onClick={() => onOpenNewUserOnboarding(myActiveMatch)}
-                  className="px-3 py-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-neutral-300 text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5"
-                >
-                  <Plus className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Simulate Opponent Acceptance</span>
-                </button>
+                {onSimulateOpponentStake && isCreatorOfActive && (
+                  <button
+                    onClick={() => onSimulateOpponentStake(myActiveMatch.id)}
+                    className="px-3.5 py-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 text-amber-400 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5"
+                  >
+                    <Zap className="w-3.5 h-3.5" />
+                    <span>Simulate Opponent Staking ₦{myActiveMatch.stakeAmount.toLocaleString()} (Test)</span>
+                  </button>
+                )}
 
-                <button
-                  onClick={() => {
-                    if (confirm(`Cancel this wager and refund ₦${myActiveMatch.stakeAmount.toLocaleString()} back to your wallet?`)) {
-                      onCancelMatch(myActiveMatch.id);
-                    }
-                  }}
-                  className="text-rose-400 hover:text-rose-300 transition-colors text-xs font-medium cursor-pointer"
-                >
-                  Cancel Wager & Refund ₦{myActiveMatch.stakeAmount.toLocaleString()}
-                </button>
+                {!isCreatorOfActive && (
+                  <button
+                    onClick={() => {
+                      setStakeTargetMatch(myActiveMatch);
+                      setStakeRole('opponent');
+                      setIsStakeModalOpen(true);
+                    }}
+                    className="px-5 py-2.5 bg-amber-400 hover:bg-amber-300 text-neutral-950 font-black rounded-xl text-xs transition-all cursor-pointer shadow-lg flex items-center gap-1.5 uppercase"
+                  >
+                    <Lock className="w-4 h-4" />
+                    <span>Accept & Send ₦{myActiveMatch.stakeAmount.toLocaleString()} Stake</span>
+                  </button>
+                )}
+
+                {isCreatorOfActive && (
+                  <button
+                    onClick={() => {
+                      if (confirm(`Cancel this wager challenge?`)) {
+                        onCancelMatch(myActiveMatch.id);
+                      }
+                    }}
+                    className="text-rose-400 hover:text-rose-300 transition-colors text-xs font-medium cursor-pointer ml-auto"
+                  >
+                    Cancel Challenge
+                  </button>
+                )}
               </div>
             </div>
           )}
 
-          {/* In progress / Submit results state */}
+          {/* STEP 2: Opponent has staked -> Host must send matching stake */}
+          {myActiveMatch.status === 'OPPONENT_STAKED_AWAITING_CREATOR' && (
+            <div className="relative z-10 p-5 rounded-2xl bg-neutral-950 border-2 border-emerald-500/60 space-y-4 animate-in fade-in">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-neutral-800">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                    <CheckCircle2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-emerald-400 uppercase tracking-wider">
+                      Opponent {myActiveMatch.opponent?.codmIgn} Has Deposited Stake!
+                    </div>
+                    <div className="text-sm font-semibold text-white">
+                      {isCreatorOfActive
+                        ? `Send your matching ₦${myActiveMatch.stakeAmount.toLocaleString()} stake now to unlock the CODM room number.`
+                        : `Your ₦${myActiveMatch.stakeAmount.toLocaleString()} stake is secured. Waiting for host to send matching stake.`}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-right font-mono-nums">
+                  <span className="text-[10px] text-neutral-400 uppercase block">Host Stake</span>
+                  <span className="text-lg font-black text-amber-400">₦{myActiveMatch.stakeAmount.toLocaleString()}</span>
+                </div>
+              </div>
+
+              {isCreatorOfActive && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStakeTargetMatch(myActiveMatch);
+                    setStakeRole('creator');
+                    setIsStakeModalOpen(true);
+                  }}
+                  className="w-full py-3.5 bg-amber-400 hover:bg-amber-300 text-neutral-950 font-black rounded-xl text-xs sm:text-sm transition-all cursor-pointer shadow-xl flex items-center justify-center gap-2 uppercase tracking-wide"
+                >
+                  <Lock className="w-4 h-4 stroke-[2.5]" />
+                  <span>Send Matching ₦{myActiveMatch.stakeAmount.toLocaleString()} Stake (Unlock Room #)</span>
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* STEP 3: Room code generated & Gameplay / Submit results state */}
           {['READY_TO_PLAY', 'IN_PROGRESS', 'SUBMITTING_RESULTS', 'VERIFYING'].includes(myActiveMatch.status) && (
             <div className="relative z-10 space-y-4">
+              {/* Room Code Revealed Banner */}
+              {myActiveMatch.roomCode && (
+                <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/40 text-center space-y-1">
+                  <div className="text-[10px] text-neutral-400 uppercase font-mono tracking-widest">
+                    Official In-Game CODM Room Number
+                  </div>
+                  <div className="flex items-center justify-center gap-2">
+                    <span className="text-2xl sm:text-4xl font-black font-mono-nums text-amber-400">
+                      {myActiveMatch.roomCode}
+                    </span>
+                    <button
+                      onClick={() => copyCode(myActiveMatch.roomCode!)}
+                      className="p-1 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-300 transition-colors cursor-pointer"
+                    >
+                      {copiedCode ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-neutral-300">
+                    Both stakes confirmed in escrow! Open CODM &gt; Private Match &gt; Join #{myActiveMatch.roomCode}.
+                  </p>
+                </div>
+              )}
+
               {/* VS Calling Bar */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="p-3 rounded-xl bg-neutral-950/90 border border-amber-500/40 flex items-center gap-3">
                   <img src={myActiveMatch.creator.avatar} alt={myActiveMatch.creator.codmIgn} className="w-10 h-10 rounded-lg object-cover bg-neutral-800" referrerPolicy="no-referrer" />
                   <div>
-                    <div className="text-[9px] text-amber-400 font-mono font-bold">TEAM ALPHA (HOST)</div>
+                    <div className="text-[9px] text-amber-400 font-mono font-bold">HOST</div>
                     <div className="font-bold text-white text-xs sm:text-sm">{myActiveMatch.creator.codmIgn}</div>
-                    <div className="text-[10px] text-emerald-400 font-mono-nums">₦{myActiveMatch.stakeAmount.toLocaleString()} Locked</div>
+                    <div className="text-[10px] text-emerald-400 font-mono-nums">🔒 ₦{myActiveMatch.stakeAmount.toLocaleString()} Locked</div>
                   </div>
                 </div>
 
                 <div className="p-3 rounded-xl bg-neutral-950/90 border border-amber-500/40 flex items-center gap-3">
                   <img src={myActiveMatch.opponent?.avatar || CODM_IMAGES.trophyPot} alt="Opponent" className="w-10 h-10 rounded-lg object-cover bg-neutral-800" referrerPolicy="no-referrer" />
                   <div>
-                    <div className="text-[9px] text-amber-400 font-mono font-bold">TEAM BRAVO (RIVAL)</div>
+                    <div className="text-[9px] text-amber-400 font-mono font-bold">OPPONENT</div>
                     <div className="font-bold text-white text-xs sm:text-sm">{myActiveMatch.opponent?.codmIgn || 'Rival Connected'}</div>
-                    <div className="text-[10px] text-emerald-400 font-mono-nums">₦{myActiveMatch.stakeAmount.toLocaleString()} Locked</div>
+                    <div className="text-[10px] text-emerald-400 font-mono-nums">🔒 ₦{myActiveMatch.stakeAmount.toLocaleString()} Locked</div>
                   </div>
                 </div>
               </div>
@@ -310,18 +423,6 @@ export const CoreArena: React.FC<CoreArenaProps> = ({
                   </button>
                 </div>
 
-                {selectedClaim === 'DRAW' && (
-                  <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-300 space-y-1">
-                    <div className="font-bold flex items-center gap-1.5 text-amber-400">
-                      <ShieldCheck className="w-4 h-4" />
-                      <span>Draw & Rematch Agreement</span>
-                    </div>
-                    <p className="text-[11px] text-neutral-300">
-                      If both combatants agree or match ends tied, <strong>100% of your ₦{myActiveMatch.stakeAmount.toLocaleString()} stake</strong> is immediately refunded back to your wallet with zero platform fee.
-                    </p>
-                  </div>
-                )}
-
                 {selectedClaim === 'VICTORY' && (
                   <div className="space-y-2 pt-1">
                     <div className="flex flex-col sm:flex-row items-center gap-2">
@@ -333,7 +434,7 @@ export const CoreArena: React.FC<CoreArenaProps> = ({
                       />
                       <button
                         type="button"
-                        onClick={() => setScreenshotPreview(CODM_IMAGES.scoreVictory)}
+                        onClick={() => setScreenshotPreview('/src/assets/images/codm_score_victory_1791303464940.jpg')}
                         className="w-full sm:w-auto px-3 py-1.5 bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 text-neutral-300 text-xs font-semibold rounded-lg transition-colors cursor-pointer whitespace-nowrap"
                       >
                         Use Demo Scoreboard
@@ -346,9 +447,6 @@ export const CoreArena: React.FC<CoreArenaProps> = ({
                           src={screenshotPreview}
                           alt="Scoreboard Preview"
                           className="w-full h-full object-cover"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src = CODM_IMAGES.scoreVictoryFallback;
-                          }}
                         />
                         <div className="absolute top-2 right-2 px-2 py-0.5 rounded bg-black/80 text-[9px] text-emerald-400 font-bold border border-emerald-500/30 font-mono">
                           READY FOR AI INSPECTION
@@ -416,7 +514,7 @@ export const CoreArena: React.FC<CoreArenaProps> = ({
       )}
 
       {/* ------------------------------------------------------------- */}
-      {/* 3. STANDARD BATTLE FORMAT CARDS (SOLO 1V1 & SQUAD BATTLES)    */}
+      {/* 2. STANDARD BATTLE FORMAT CARDS (SOLO 1V1 & SQUAD BATTLES)    */}
       {/* ------------------------------------------------------------- */}
       {!myActiveMatch && (
         <div className="space-y-8">
@@ -432,7 +530,7 @@ export const CoreArena: React.FC<CoreArenaProps> = ({
               </h2>
             </div>
             <div className="text-xs font-mono-nums font-bold text-neutral-400">
-              Min Stake: <strong className="text-amber-400">₦1,000</strong> · 10% Escrow Rake
+              ₦0 Upfront to Generate Link · Min Stake: <strong className="text-amber-400">₦1,000</strong>
             </div>
           </div>
 
@@ -478,7 +576,7 @@ export const CoreArena: React.FC<CoreArenaProps> = ({
                 <div className="pt-2 flex items-center gap-4 text-xs font-mono-nums text-neutral-400">
                   <span className="text-amber-400 font-bold">1v1 Format</span>
                   <span>·</span>
-                  <span>Instant Pot Escrow</span>
+                  <span>On-Demand Escrow</span>
                   <span>·</span>
                   <span>AI Referee</span>
                 </div>
@@ -491,7 +589,7 @@ export const CoreArena: React.FC<CoreArenaProps> = ({
                   className="w-full py-3.5 bg-amber-400 hover:bg-amber-300 text-neutral-950 font-black rounded-2xl text-xs sm:text-sm transition-all shadow-xl hover:scale-105 active:scale-95 cursor-pointer flex items-center justify-center gap-2 uppercase tracking-wide"
                 >
                   <Swords className="w-4 h-4 stroke-[2.5]" />
-                  <span>Create 1v1 Wager (Shipment)</span>
+                  <span>Generate 1v1 Bet Link (Shipment)</span>
                 </button>
               </div>
             </div>
@@ -549,27 +647,25 @@ export const CoreArena: React.FC<CoreArenaProps> = ({
                   className="w-full py-3.5 bg-emerald-400 hover:bg-emerald-300 text-neutral-950 font-black rounded-2xl text-xs sm:text-sm transition-all shadow-xl hover:scale-105 active:scale-95 cursor-pointer flex items-center justify-center gap-2 uppercase tracking-wide"
                 >
                   <Swords className="w-4 h-4 stroke-[2.5]" />
-                  <span>Create Squad Wager (Standoff)</span>
+                  <span>Generate Squad Bet Link (Standoff)</span>
                 </button>
               </div>
             </div>
           </div>
 
-          {/* 4. LIVE OPEN CHALLENGES MATCHMAKING LOBBY */}
+          {/* 3. LIVE OPEN CHALLENGES MATCHMAKING LOBBY */}
           {openChallenges.length > 0 && (
             <div className="space-y-4 pt-4">
               <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-neutral-400 font-mono">
                 <div className="flex items-center gap-2">
                   <Flame className="w-4 h-4 text-amber-400" />
-                  <span>Live Open Challenges (Ready to Join)</span>
+                  <span>Live Open Challenges (Accept & Send Stake)</span>
                 </div>
                 <span className="text-amber-400 font-mono-nums">{openChallenges.length} Open Matches</span>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {openChallenges.map((m) => {
-                  const pot = m.stakeAmount * 2;
-                  const payout = pot - Math.round(pot * 0.10);
                   return (
                     <div
                       key={m.id}
@@ -577,7 +673,7 @@ export const CoreArena: React.FC<CoreArenaProps> = ({
                     >
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-mono-nums bg-amber-500/15 text-amber-400 border border-amber-500/30 px-2.5 py-1 rounded-lg font-black">
-                          ROOM: {m.roomCode}
+                          CHALLENGE: #{m.challengeCode}
                         </span>
                         <span className="text-sm font-mono-nums font-black text-emerald-400">
                           ₦{m.stakeAmount.toLocaleString()} Stake
@@ -591,16 +687,20 @@ export const CoreArena: React.FC<CoreArenaProps> = ({
                         </div>
                         <div className="text-right">
                           <div className="text-[10px] text-neutral-400 uppercase font-mono">Winner Pot</div>
-                          <div className="font-black text-amber-400 font-mono-nums text-sm">₦{payout.toLocaleString()}</div>
+                          <div className="font-black text-amber-400 font-mono-nums text-sm">₦{m.winnerPayout.toLocaleString()}</div>
                         </div>
                       </div>
 
                       <button
-                        onClick={() => onJoinMatch(m.id, currentUser.id)}
+                        onClick={() => {
+                          setStakeTargetMatch(m);
+                          setStakeRole('opponent');
+                          setIsStakeModalOpen(true);
+                        }}
                         className="w-full py-3 bg-amber-400 hover:bg-amber-300 text-neutral-950 font-black rounded-xl text-xs sm:text-sm transition-all cursor-pointer flex items-center justify-center gap-2 uppercase tracking-wide shadow-md"
                       >
-                        <Swords className="w-4 h-4 stroke-[2.5]" />
-                        <span>Accept Challenge & Lock ₦{m.stakeAmount.toLocaleString()}</span>
+                        <Lock className="w-4 h-4 stroke-[2.5]" />
+                        <span>Accept & Send ₦{m.stakeAmount.toLocaleString()} Stake</span>
                       </button>
                     </div>
                   );
@@ -610,6 +710,19 @@ export const CoreArena: React.FC<CoreArenaProps> = ({
           )}
         </div>
       )}
+
+      {/* Stake Payment Modal */}
+      <StakePaymentModal
+        isOpen={isStakeModalOpen}
+        match={stakeTargetMatch}
+        currentUser={currentUser}
+        role={stakeRole}
+        onClose={() => {
+          setIsStakeModalOpen(false);
+          setStakeTargetMatch(null);
+        }}
+        onConfirmStake={handleConfirmStake}
+      />
     </div>
   );
 };

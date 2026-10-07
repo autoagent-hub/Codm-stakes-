@@ -268,7 +268,11 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({
                     {isActive && (
                       <span className="px-2.5 py-1 rounded-md bg-amber-500/20 border border-amber-500/40 text-amber-400 font-mono text-[11px] font-black tracking-wider flex items-center gap-1 animate-pulse">
                         <Flame className="w-3 h-3" />
-                        {m.status === 'PENDING_OPPONENT' ? 'WAITING FOR OPPONENT' : 'LIVE MATCH IN PROGRESS'}
+                        {m.status === 'PENDING_OPPONENT_STAKE'
+                          ? 'WAITING FOR OPPONENT'
+                          : m.status === 'OPPONENT_STAKED_AWAITING_CREATOR'
+                          ? 'OPPONENT STAKED · AWAITING HOST'
+                          : 'LIVE MATCH IN PROGRESS'}
                       </span>
                     )}
                     {isCancelled && (
@@ -284,14 +288,14 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({
 
                   {/* Room Code Pill */}
                   <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-neutral-950 border border-neutral-800 text-xs">
-                    <span className="text-[10px] text-neutral-500 font-mono">ROOM:</span>
-                    <span className="font-mono-nums font-bold text-amber-400">{m.roomCode}</span>
+                    <span className="text-[10px] text-neutral-500 font-mono">{m.roomCode ? 'ROOM:' : 'CHALLENGE:'}</span>
+                    <span className="font-mono-nums font-bold text-amber-400">{m.roomCode || m.challengeCode}</span>
                     <button
-                      onClick={() => copyCode(m.roomCode)}
+                      onClick={() => copyCode(m.roomCode || m.challengeCode)}
                       className="text-neutral-400 hover:text-white transition-colors ml-0.5 cursor-pointer"
-                      title="Copy room code"
+                      title="Copy code"
                     >
-                      {copiedCode === m.roomCode ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                      {copiedCode === (m.roomCode || m.challengeCode) ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
                     </button>
                   </div>
                 </div>

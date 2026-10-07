@@ -26,7 +26,7 @@ export const InviteOpponentModal: React.FC<InviteOpponentModalProps> = ({
 
   const inviteUrl = `${window.location.origin}/?join=${match.id}`;
   const whatsappShareText = encodeURIComponent(
-    `⚔️ CODM 1v1 CHALLENGE!\nI staked ₦${match.stakeAmount.toLocaleString()} on a 1v1 match in CODM.\nRoom Code: ${match.roomCode}\nTotal Pot: ₦${match.potAmount.toLocaleString()}.\nAccept challenge & claim the pot here:\n${inviteUrl}`
+    `⚔️ CODM 1v1 CHALLENGE!\nI set a ₦${match.stakeAmount.toLocaleString()} stake on a ${match.gameMode} (${match.map}) match.\nChallenge Code: ${match.challengeCode}\nTotal Pot: ₦${match.potAmount.toLocaleString()}.\nAccept challenge & send your stake to unlock our game room:\n${inviteUrl}`
   );
 
   const copyLink = () => {
@@ -36,7 +36,7 @@ export const InviteOpponentModal: React.FC<InviteOpponentModalProps> = ({
   };
 
   const copyCode = () => {
-    navigator.clipboard.writeText(match.roomCode);
+    navigator.clipboard.writeText(match.challengeCode);
     setCopiedCode(true);
     setTimeout(() => setCopiedCode(false), 2000);
   };
@@ -51,8 +51,8 @@ export const InviteOpponentModal: React.FC<InviteOpponentModalProps> = ({
               <Share2 className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-base sm:text-lg font-bold font-heading text-white">Share 1v1 Invite Link</h2>
-              <p className="text-xs text-neutral-400">Match created & ₦{match.stakeAmount.toLocaleString()} held in escrow</p>
+              <h2 className="text-base sm:text-lg font-bold font-heading text-white">Share 1v1 Challenge Link</h2>
+              <p className="text-xs text-neutral-400">Challenge created · ₦0 upfront · ₦{match.stakeAmount.toLocaleString()} stake</p>
             </div>
           </div>
           <button
@@ -65,23 +65,23 @@ export const InviteOpponentModal: React.FC<InviteOpponentModalProps> = ({
 
         {/* Content */}
         <div className="p-5 space-y-5">
-          {/* Room Code Card */}
+          {/* Challenge Code Card */}
           <div className="p-4 rounded-xl bg-neutral-950 border border-amber-500/30 text-center space-y-1 relative overflow-hidden">
             <div className="text-[11px] font-semibold text-neutral-400 uppercase tracking-widest">
-              Generated In-Game Room Number
+              Challenge Invite Code
             </div>
             <div className="text-2xl sm:text-3xl font-black font-mono-nums tracking-wider text-amber-400">
-              {match.roomCode}
+              {match.challengeCode}
             </div>
             <p className="text-[11px] text-neutral-400">
-              Use this code to invite or locate your opponent in CODM Private Match
+              Share this code or link with your rival to accept your wager
             </p>
             <button
               onClick={copyCode}
               className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs font-semibold rounded-lg transition-colors cursor-pointer"
             >
               {copiedCode ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-              <span>{copiedCode ? 'Room Code Copied!' : 'Copy Room Code'}</span>
+              <span>{copiedCode ? 'Challenge Code Copied!' : 'Copy Challenge Code'}</span>
             </button>
           </div>
 
@@ -105,9 +105,12 @@ export const InviteOpponentModal: React.FC<InviteOpponentModalProps> = ({
                 <span>{copiedLink ? 'Copied!' : 'Copy Link'}</span>
               </button>
             </div>
-            <p className="text-[11px] text-neutral-400 mt-1">
-              When your opponent clicks this link, they will accept the wager and ₦{match.stakeAmount.toLocaleString()} will be deducted from both wallets into escrow.
-            </p>
+            <div className="mt-2 p-3 rounded-xl bg-neutral-950 border border-neutral-800 text-[11px] text-neutral-400 space-y-1">
+              <div className="font-semibold text-amber-300">Next Steps:</div>
+              <div>1. Opponent opens link and sends ₦{match.stakeAmount.toLocaleString()} to accept challenge.</div>
+              <div>2. You will send your matching ₦{match.stakeAmount.toLocaleString()} stake.</div>
+              <div>3. The system will immediately generate your in-game CODM room number!</div>
+            </div>
           </div>
 
           {/* Social share actions */}
@@ -173,7 +176,7 @@ export const InviteOpponentModal: React.FC<InviteOpponentModalProps> = ({
         <div className="p-4 border-t border-neutral-800 bg-neutral-950/60 flex items-center justify-between">
           <button
             onClick={() => {
-              if (confirm('Cancel this match and refund your ₦' + match.stakeAmount.toLocaleString() + ' escrow back to your available balance?')) {
+              if (confirm('Are you sure you want to cancel this match challenge?')) {
                 onCancelMatch(match.id);
                 onClose();
               }
@@ -181,7 +184,7 @@ export const InviteOpponentModal: React.FC<InviteOpponentModalProps> = ({
             className="text-xs text-rose-400 hover:underline cursor-pointer flex items-center gap-1"
           >
             <AlertTriangle className="w-3.5 h-3.5" />
-            <span>Cancel Bet & Refund ₦{match.stakeAmount.toLocaleString()}</span>
+            <span>Cancel Match Challenge</span>
           </button>
 
           <button

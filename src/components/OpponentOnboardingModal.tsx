@@ -66,7 +66,7 @@ export const OpponentOnboardingModal: React.FC<OpponentOnboardingModalProps> = (
             </div>
             <div>
               <h2 className="text-base sm:text-lg font-bold font-heading text-white">Accept 1v1 Challenge</h2>
-              <p className="text-xs text-neutral-400">Sign up with your CODM gamer tag to join match #{match.roomCode}</p>
+              <p className="text-xs text-neutral-400">Sign up with your CODM gamer tag to review & stake on #{match.challengeCode}</p>
             </div>
           </div>
           <button
@@ -90,7 +90,7 @@ export const OpponentOnboardingModal: React.FC<OpponentOnboardingModalProps> = (
           <div className="p-4 rounded-xl bg-neutral-950 border border-amber-500/30 space-y-2">
             <div className="text-[11px] font-semibold text-neutral-400 uppercase tracking-wider flex items-center justify-between">
               <span>Challenger</span>
-              <span className="text-amber-400 font-mono-nums font-bold">Room: {match.roomCode}</span>
+              <span className="text-amber-400 font-mono-nums font-bold">Challenge: #{match.challengeCode}</span>
             </div>
 
             <div className="flex items-center justify-between">

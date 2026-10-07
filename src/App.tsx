@@ -2,18 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { UserProfile, Match } from './types';
 import {
   fetchUser, fetchMatches, fetchMatch, createMatch, joinMatch,
-  cancelMatch, submitMatchResult, depositWallet, withdrawWallet,
-  createUser, signUpUser, signInUser, DEFAULT_USERS
+  opponentStakeMatch, creatorStakeMatch,
+  cancelMatch, submitMatchResult,
+  createUser, signUpUser, signInUser, updateUser, DEFAULT_USERS
 } from './services/api';
 import { Navbar, NavigationTab } from './components/Navbar';
 import { BottomNavbar } from './components/BottomNavbar';
 import { LandingPage } from './components/LandingPage';
 import { AuthPage } from './components/AuthPage';
 import { CoreArena } from './components/CoreArena';
-import { WalletDashboard } from './components/WalletDashboard';
-import { FundingPage } from './components/FundingPage';
-import { ProfilePage } from './components/ProfilePage';
+import { LeaderboardPage } from './components/LeaderboardPage';
+import { RulesPage } from './components/RulesPage';
 import { HistoryPage } from './components/HistoryPage';
+import { ProfilePage } from './components/ProfilePage';
 import { CreateBetModal } from './components/CreateBetModal';
 import { OpponentOnboardingModal } from './components/OpponentOnboardingModal';
 
@@ -33,7 +34,7 @@ export default function App() {
 
   // Initial Data Fetch & URL Deep Link Check
   useEffect(() => {
-    loadData();
+    loadInitialSessionAndData();
 
     // Check URL query parameters for ?join=MATCH_ID
     const urlParams = new URLSearchParams(window.location.search);
@@ -43,9 +44,33 @@ export default function App() {
     }
   }, []);
 
-  const loadData = async () => {
+  const loadInitialSessionAndData = async () => {
     try {
-      const u = await fetchUser(currentUser.id);
+      const savedUserId = localStorage.getItem('codm_current_user_id');
+      let activeUser = currentUser;
+      if (savedUserId) {
+        try {
+          activeUser = await fetchUser(savedUserId);
+          setCurrentUser(activeUser);
+          setCurrentTab('arena');
+        } catch (e) {
+          console.error('Could not load saved user:', e);
+        }
+      } else {
+        const u = await fetchUser(currentUser.id);
+        setCurrentUser(u);
+      }
+      const mList = await fetchMatches();
+      setMatches(mList);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const loadData = async (userToFetchId?: string) => {
+    try {
+      const uid = userToFetchId || currentUser.id;
+      const u = await fetchUser(uid);
       setCurrentUser(u);
       const mList = await fetchMatches();
       setMatches(mList);
@@ -57,7 +82,7 @@ export default function App() {
   const handleDeepLinkJoin = async (matchId: string) => {
     try {
       const match = await fetchMatch(matchId);
-      if (match && match.status === 'PENDING_OPPONENT') {
+      if (match && match.status === 'PENDING_OPPONENT_STAKE') {
         setOnboardingTargetMatch(match);
         setIsOnboardingModalOpen(true);
       } else if (match) {
@@ -67,8 +92,6 @@ export default function App() {
       console.error('Deep link match lookup error:', err);
     }
   };
-
-
 
   const handleOpenCreateBet = (mode?: string, stake?: number) => {
     setCreateBetInitialMode(mode);
@@ -113,6 +136,43 @@ export default function App() {
     }
   };
 
+  const handleOpponentStake = async (
+    matchId: string,
+    paymentMethod: 'bank_transfer' | 'opay_palmpay' | 'card' | 'wallet_balance'
+  ) => {
+    await opponentStakeMatch(matchId, {
+      opponentId: currentUser.id,
+      paymentMethod,
+    });
+    const updatedUser = await fetchUser(currentUser.id);
+    setCurrentUser(updatedUser);
+    setAllUsers((prev) => ({ ...prev, [currentUser.id]: updatedUser }));
+    await loadData();
+  };
+
+  const handleCreatorStake = async (
+    matchId: string,
+    paymentMethod: 'bank_transfer' | 'opay_palmpay' | 'card' | 'wallet_balance'
+  ) => {
+    await creatorStakeMatch(matchId, {
+      creatorId: currentUser.id,
+      paymentMethod,
+    });
+    const updatedUser = await fetchUser(currentUser.id);
+    setCurrentUser(updatedUser);
+    setAllUsers((prev) => ({ ...prev, [currentUser.id]: updatedUser }));
+    await loadData();
+  };
+
+  const handleSimulateOpponentStake = async (matchId: string) => {
+    const shadowUser = DEFAULT_USERS.user_shadow;
+    await opponentStakeMatch(matchId, {
+      opponentId: shadowUser.id,
+      paymentMethod: 'bank_transfer',
+    });
+    await loadData();
+  };
+
   const handleCompleteOnboarding = async (userData: {
     codmIgn: string;
     codmUid?: string;
@@ -155,20 +215,6 @@ export default function App() {
     await loadData();
   };
 
-  const handleDeposit = async (amount: number, method: string) => {
-    await depositWallet(currentUser.id, amount, method);
-    const updatedUser = await fetchUser(currentUser.id);
-    setCurrentUser(updatedUser);
-    setAllUsers((prev) => ({ ...prev, [currentUser.id]: updatedUser }));
-  };
-
-  const handleWithdraw = async (amount: number, bankDetails: { bankName: string; accountNumber: string; accountName: string }) => {
-    await withdrawWallet(currentUser.id, amount, bankDetails);
-    const updatedUser = await fetchUser(currentUser.id);
-    setCurrentUser(updatedUser);
-    setAllUsers((prev) => ({ ...prev, [currentUser.id]: updatedUser }));
-  };
-
   const handleSignUp = async (data: {
     email: string;
     password: string;
@@ -177,9 +223,10 @@ export default function App() {
     initialDeposit: number;
   }) => {
     const user = await signUpUser(data);
+    localStorage.setItem('codm_current_user_id', user.id);
     setCurrentUser(user);
     setAllUsers((prev) => ({ ...prev, [user.id]: user }));
-    await loadData();
+    await loadData(user.id);
     setCurrentTab('arena');
   };
 
@@ -188,15 +235,28 @@ export default function App() {
     password: string;
   }) => {
     const user = await signInUser(data);
+    localStorage.setItem('codm_current_user_id', user.id);
     setCurrentUser(user);
-    await loadData();
+    await loadData(user.id);
     setCurrentTab('arena');
   };
 
+  const handleSignOut = () => {
+    localStorage.removeItem('codm_current_user_id');
+    setCurrentUser(DEFAULT_USERS.user_ghost);
+    setCurrentTab('landing');
+  };
+
   const handleUpdateUser = async (updatedData: Partial<UserProfile>) => {
-    const updated = { ...currentUser, ...updatedData };
-    setCurrentUser(updated);
-    setAllUsers((prev) => ({ ...prev, [currentUser.id]: updated }));
+    try {
+      const saved = await updateUser(currentUser.id, updatedData);
+      setCurrentUser(saved);
+      setAllUsers((prev) => ({ ...prev, [currentUser.id]: saved }));
+    } catch (err) {
+      const updated = { ...currentUser, ...updatedData };
+      setCurrentUser(updated);
+      setAllUsers((prev) => ({ ...prev, [currentUser.id]: updated }));
+    }
   };
 
   // 1. STANDALONE SEPARATED LANDING PAGE VIEW
@@ -227,20 +287,32 @@ export default function App() {
     );
   }
 
-  // 3. DASHBOARD / IN-APP VIEW (ARENA, HISTORY, PROFILE, WALLET, FUNDING)
+  // 3. IN-APP PAGES WITH TOP NAVBAR & BOTTOM DOCK
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 flex flex-col bg-tactical-grid selection:bg-amber-500 selection:text-black relative">
-      {/* Main App Container with bottom padding for bottom dock navigation */}
+      {/* Top Navigation Bar */}
+      <Navbar
+        currentUser={currentUser}
+        currentTab={currentTab}
+        setCurrentTab={setCurrentTab}
+        openCreateBetModal={() => handleOpenCreateBet()}
+        onSignOut={handleSignOut}
+      />
+
+      {/* Main Separate Page Content */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-28">
+        {/* PAGE 1: ARENA / DASHBOARD */}
         {currentTab === 'arena' && (
           <CoreArena
             currentUser={currentUser}
             matches={matches}
             onCreateBet={handleCreateBet}
             onJoinMatch={handleJoinMatch}
+            onOpponentStake={handleOpponentStake}
+            onCreatorStake={handleCreatorStake}
+            onSimulateOpponentStake={handleSimulateOpponentStake}
             onSubmitResult={handleSubmitResult}
             onCancelMatch={handleCancelMatch}
-            onOpenWallet={() => setCurrentTab('wallet_dashboard')}
             onRefresh={loadData}
             onOpenCreateBet={handleOpenCreateBet}
             onOpenNewUserOnboarding={(targetMatch) => {
@@ -250,6 +322,25 @@ export default function App() {
           />
         )}
 
+        {/* PAGE 2: LEADERBOARD & RANKINGS */}
+        {currentTab === 'leaderboard' && (
+          <LeaderboardPage
+            currentUser={currentUser}
+            matches={matches}
+            onOpenCreateBet={handleOpenCreateBet}
+            onNavigateToArena={() => setCurrentTab('arena')}
+          />
+        )}
+
+        {/* PAGE 3: RULES & FAIR PLAY HANDBOOK */}
+        {currentTab === 'rules' && (
+          <RulesPage
+            onOpenCreateBet={handleOpenCreateBet}
+            onNavigateToArena={() => setCurrentTab('arena')}
+          />
+        )}
+
+        {/* PAGE 4: MATCH HISTORY & LEDGER */}
         {currentTab === 'history' && (
           <HistoryPage
             currentUser={currentUser}
@@ -259,36 +350,27 @@ export default function App() {
           />
         )}
 
+        {/* PAGE 5: GAMER PROFILE */}
         {currentTab === 'profile' && (
           <ProfilePage
             currentUser={currentUser}
             matches={matches}
             onUpdateUser={handleUpdateUser}
-            onNavigateToWallet={() => setCurrentTab('wallet_dashboard')}
+            onNavigateToArena={() => setCurrentTab('arena')}
             onNavigateToHistory={() => setCurrentTab('history')}
-            onNavigateToFunding={() => setCurrentTab('funding')}
+            onNavigateToLeaderboard={() => setCurrentTab('leaderboard')}
+            onNavigateToRules={() => setCurrentTab('rules')}
             onOpenCreateBet={handleOpenCreateBet}
-            onSignOut={() => setCurrentTab('landing')}
-          />
-        )}
-
-        {(currentTab === 'wallet_dashboard' || currentTab === 'funding') && (
-          <WalletDashboard
-            currentUser={currentUser}
-            onNavigateToFunding={() => setCurrentTab('funding')}
-            onDeposit={handleDeposit}
-            onOpenCreateBet={() => handleOpenCreateBet()}
-            onWithdraw={handleWithdraw}
-            onRefresh={loadData}
+            onSignOut={handleSignOut}
           />
         )}
       </main>
 
-      {/* Fixed Bottom Navigation Dock (Icons Only in requested order: Dashboard, Wallet & Fund, History, Profile) */}
+      {/* Fixed Bottom Navigation Dock for Mobile & Quick Switching */}
       <BottomNavbar
         currentUser={currentUser}
         currentTab={currentTab}
-        setCurrentTab={(tab) => setCurrentTab(tab)}
+        setCurrentTab={setCurrentTab}
       />
 
       {/* App Footer */}
@@ -309,7 +391,7 @@ export default function App() {
         </div>
       </footer>
 
-      {/* Bet Creation Modal (Supports 1v1 & Normal Matches) */}
+      {/* Bet Creation Modal */}
       <CreateBetModal
         currentUser={currentUser}
         isOpen={isCreateBetOpen}
@@ -321,10 +403,6 @@ export default function App() {
           setCreateBetInitialStake(undefined);
         }}
         onSubmit={handleCreateBet}
-        onOpenWallet={() => {
-          setIsCreateBetOpen(false);
-          setCurrentTab('funding');
-        }}
       />
 
       {/* Opponent Onboarding Modal (For new players joining from invite link) */}

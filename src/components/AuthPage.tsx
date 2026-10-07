@@ -5,6 +5,9 @@ import {
   ArrowRight, ArrowLeft, AlertCircle, CheckCircle2, Wallet, Sparkles, UserCheck
 } from 'lucide-react';
 import { CODM_IMAGES } from '../assets/images';
+import { GoogleSignInWidget, GoogleUserProfile } from './GoogleSignInWidget';
+import { signInWithGoogleWidget } from '../services/api';
+import { getUserFromFirestore, syncUserToFirestore } from '../firebase/service';
 
 interface AuthPageProps {
   initialMode?: 'signin' | 'signup';
@@ -21,6 +24,7 @@ interface AuthPageProps {
   }) => Promise<void>;
   onBackToLanding: () => void;
   demoUsers?: Record<string, UserProfile>;
+  onGoogleSuccess?: (user: UserProfile) => void;
 }
 
 export const AuthPage: React.FC<AuthPageProps> = ({
@@ -29,6 +33,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   onSignIn,
   onBackToLanding,
   demoUsers,
+  onGoogleSuccess,
 }) => {
   const [mode, setMode] = useState<'signin' | 'signup'>(initialMode);
 
@@ -115,6 +120,27 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       });
     } catch (err: any) {
       setError(err.message || 'Demo sign in failed');
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleAuthSuccess = async (gUser: GoogleUserProfile) => {
+    setError(null);
+    setLoading(true);
+    try {
+      const profile = await signInWithGoogleWidget(gUser);
+      // Optional background sync to Firestore
+      try {
+        await syncUserToFirestore(profile);
+      } catch (_) {
+        // Firestore sync is optional/non-blocking
+      }
+      if (onGoogleSuccess) {
+        onGoogleSuccess(profile);
+      }
+    } catch (err: any) {
+      setError(err.message || 'Google Sign-In failed');
+    } finally {
       setLoading(false);
     }
   };
@@ -217,6 +243,21 @@ export const AuthPage: React.FC<AuthPageProps> = ({
               <span>{error}</span>
             </div>
           )}
+
+          {/* Embedded Google Identity Services Widget */}
+          <div className="w-full">
+            <GoogleSignInWidget
+              mode={mode}
+              onSuccess={handleGoogleAuthSuccess}
+              onError={(msg) => setError(msg)}
+            />
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="h-px bg-neutral-800 flex-1" />
+            <span className="text-[10px] text-neutral-500 font-mono uppercase tracking-wider">or continue below</span>
+            <div className="h-px bg-neutral-800 flex-1" />
+          </div>
 
           {/* ===================== SIGN UP FORM ===================== */}
           {mode === 'signup' ? (

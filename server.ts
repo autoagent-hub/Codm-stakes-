@@ -5,6 +5,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI } from '@google/genai';
+import { initDatabase, pool } from './db.js';
 
 dotenv.config();
 
@@ -57,7 +58,8 @@ interface UserProfile {
 
 interface Match {
   id: string;
-  roomCode: string;
+  challengeCode: string;
+  roomCode?: string;
   gameMode: string;
   map: string;
   rules: string[];
@@ -66,8 +68,18 @@ interface Match {
   platformFeePercentage: number;
   platformFee: number;
   winnerPayout: number;
-  status: 'PENDING_OPPONENT' | 'READY_TO_PLAY' | 'IN_PROGRESS' | 'SUBMITTING_RESULTS' | 'VERIFYING' | 'SETTLED' | 'DISPUTED' | 'CANCELLED';
+  status:
+    | 'PENDING_OPPONENT_STAKE'
+    | 'OPPONENT_STAKED_AWAITING_CREATOR'
+    | 'READY_TO_PLAY'
+    | 'IN_PROGRESS'
+    | 'SUBMITTING_RESULTS'
+    | 'VERIFYING'
+    | 'SETTLED'
+    | 'DISPUTED'
+    | 'CANCELLED';
   createdAt: number;
+  roomGeneratedAt?: number;
   creator: {
     id: string;
     username: string;
@@ -182,7 +194,184 @@ const userPasswords: Record<string, string> = {
   user_shadow: 'password123',
 };
 
+// Database synchronization helpers
+async function syncUserToDb(user: UserProfile, password?: string) {
+  try {
+    await pool.query(`
+      INSERT INTO users (id, username, codm_ign, codm_uid, tier, clan, email, phone, password_hash, balance, escrow_balance, total_winnings, wins, losses, draws, avatar, created_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+      ON CONFLICT (id) DO UPDATE SET
+        username = EXCLUDED.username,
+        codm_ign = EXCLUDED.codm_ign,
+        codm_uid = EXCLUDED.codm_uid,
+        tier = EXCLUDED.tier,
+        clan = EXCLUDED.clan,
+        email = EXCLUDED.email,
+        phone = EXCLUDED.phone,
+        password_hash = COALESCE(EXCLUDED.password_hash, users.password_hash),
+        balance = EXCLUDED.balance,
+        escrow_balance = EXCLUDED.escrow_balance,
+        total_winnings = EXCLUDED.total_winnings,
+        wins = EXCLUDED.wins,
+        losses = EXCLUDED.losses,
+        draws = EXCLUDED.draws,
+        avatar = EXCLUDED.avatar;
+    `, [
+      user.id,
+      user.username,
+      user.codmIgn,
+      user.codmUid,
+      user.tier || 'LEGENDARY TIER',
+      user.clan || '[1V1_PRO]',
+      user.email,
+      user.phone,
+      password || userPasswords[user.id] || null,
+      user.balance || 0,
+      user.escrowBalance || 0,
+      user.totalWinnings || 0,
+      user.wins || 0,
+      user.losses || 0,
+      user.draws || 0,
+      user.avatar,
+      Date.now()
+    ]);
+  } catch (err) {
+    console.error(`⚠️ Could not sync user ${user.id} to Supabase:`, err);
+  }
+}
+
+async function syncMatchToDb(match: any) {
+  try {
+    await pool.query(`
+      INSERT INTO matches (
+        id, challenge_code, room_code, game_mode, map, rules,
+        stake_amount, pot_amount, platform_fee_percentage, platform_fee, winner_payout,
+        status, creator_id, creator_data, opponent_id, opponent_data,
+        winner_id, winner_ign, resolution_notes, chat_messages, created_at, room_generated_at, settled_at
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
+      ON CONFLICT (id) DO UPDATE SET
+        room_code = EXCLUDED.room_code,
+        status = EXCLUDED.status,
+        opponent_id = EXCLUDED.opponent_id,
+        opponent_data = EXCLUDED.opponent_data,
+        winner_id = EXCLUDED.winner_id,
+        winner_ign = EXCLUDED.winner_ign,
+        resolution_notes = EXCLUDED.resolution_notes,
+        chat_messages = EXCLUDED.chat_messages,
+        room_generated_at = EXCLUDED.room_generated_at,
+        settled_at = EXCLUDED.settled_at;
+    `, [
+      match.id,
+      match.challengeCode,
+      match.roomCode || null,
+      match.gameMode,
+      match.map,
+      JSON.stringify(match.rules || []),
+      match.stakeAmount,
+      match.potAmount,
+      match.platformFeePercentage || 10,
+      match.platformFee || 0,
+      match.winnerPayout,
+      match.status,
+      match.creator.id,
+      JSON.stringify(match.creator),
+      match.opponent ? match.opponent.id : null,
+      match.opponent ? JSON.stringify(match.opponent) : null,
+      match.winnerId || null,
+      match.winnerIgn || null,
+      match.resolutionNotes || null,
+      JSON.stringify(match.chatMessages || []),
+      match.createdAt,
+      match.roomGeneratedAt || null,
+      match.settledAt || null
+    ]);
+  } catch (err) {
+    console.error(`⚠️ Could not sync match ${match.id} to Supabase:`, err);
+  }
+}
+
+async function loadDataFromSupabase() {
+  try {
+    const userRows = await pool.query('SELECT * FROM users');
+    for (const r of userRows.rows) {
+      users[r.id] = {
+        id: r.id,
+        username: r.username || r.codm_ign,
+        codmIgn: r.codm_ign,
+        codmUid: r.codm_uid,
+        tier: r.tier || 'LEGENDARY TIER',
+        clan: r.clan || '[1V1_PRO]',
+        email: r.email || '',
+        phone: r.phone || '+234 800 000 0000',
+        balance: parseFloat(r.balance || 0),
+        escrowBalance: parseFloat(r.escrow_balance || 0),
+        totalWinnings: parseFloat(r.total_winnings || 0),
+        wins: parseInt(r.wins || 0, 10),
+        losses: parseInt(r.losses || 0, 10),
+        draws: parseInt(r.draws || 0, 10),
+        avatar: r.avatar,
+        transactions: [],
+      };
+      if (r.password_hash) {
+        userPasswords[r.id] = r.password_hash;
+      }
+    }
+
+    const matchRows = await pool.query('SELECT * FROM matches ORDER BY created_at DESC');
+    for (const m of matchRows.rows) {
+      matches[m.id] = {
+        id: m.id,
+        challengeCode: m.challenge_code,
+        roomCode: m.room_code || undefined,
+        gameMode: m.game_mode,
+        map: m.map,
+        rules: typeof m.rules === 'string' ? JSON.parse(m.rules) : m.rules || [],
+        stakeAmount: parseFloat(m.stake_amount),
+        potAmount: parseFloat(m.pot_amount),
+        platformFeePercentage: parseInt(m.platform_fee_percentage, 10) || 10,
+        platformFee: parseFloat(m.platform_fee || 0),
+        winnerPayout: parseFloat(m.winner_payout),
+        status: m.status,
+        createdAt: parseInt(m.created_at, 10),
+        creator: typeof m.creator_data === 'string' ? JSON.parse(m.creator_data) : m.creator_data,
+        opponent: m.opponent_data ? (typeof m.opponent_data === 'string' ? JSON.parse(m.opponent_data) : m.opponent_data) : undefined,
+        winnerId: m.winner_id || undefined,
+        winnerIgn: m.winner_ign || undefined,
+        resolutionNotes: m.resolution_notes || undefined,
+        chatMessages: typeof m.chat_messages === 'string' ? JSON.parse(m.chat_messages) : m.chat_messages || [],
+        roomGeneratedAt: m.room_generated_at ? parseInt(m.room_generated_at, 10) : undefined,
+      };
+    }
+    console.log(`📦 Loaded ${Object.keys(users).length} users and ${Object.keys(matches).length} matches from Supabase PostgreSQL.`);
+  } catch (err) {
+    console.error('⚠️ Could not load data from Supabase:', err);
+  }
+}
+
 // REST API ROUTES
+app.get('/api/db-status', async (req, res) => {
+  try {
+    const client = await pool.connect();
+    const result = await client.query('SELECT NOW() as now, version() as version');
+    client.release();
+    res.json({
+      connected: true,
+      database: 'Supabase PostgreSQL',
+      timestamp: result.rows[0].now,
+      version: result.rows[0].version,
+      usersCount: Object.keys(users).length,
+      matchesCount: Object.keys(matches).length,
+    });
+  } catch (err: any) {
+    res.status(500).json({
+      connected: false,
+      error: err.message,
+      fallback: 'In-memory data store active',
+    });
+  }
+});
+
 app.get('/api/users/:id', (req, res) => {
   const user = users[req.params.id];
   if (!user) {
@@ -246,6 +435,7 @@ app.post('/api/auth/register', (req, res) => {
 
   users[id] = newUser;
   userPasswords[id] = password;
+  syncUserToDb(newUser, password);
   res.status(201).json(newUser);
 });
 
@@ -310,7 +500,27 @@ app.post('/api/users', (req, res) => {
   if (password) {
     userPasswords[id] = password;
   }
+  syncUserToDb(newUser, password);
   res.json(newUser);
+});
+
+// Update User Profile
+app.patch('/api/users/:id', async (req, res) => {
+  const user = users[req.params.id];
+  if (!user) return res.status(404).json({ error: 'User not found' });
+
+  const { username, codmIgn, codmUid, email, phone, avatar, tier, clan } = req.body;
+  if (username !== undefined) user.username = username;
+  if (codmIgn !== undefined) user.codmIgn = codmIgn;
+  if (codmUid !== undefined) user.codmUid = codmUid;
+  if (email !== undefined) user.email = email;
+  if (phone !== undefined) user.phone = phone;
+  if (avatar !== undefined) user.avatar = avatar;
+  if (tier !== undefined) user.tier = tier;
+  if (clan !== undefined) user.clan = clan;
+
+  await syncUserToDb(user);
+  res.json(user);
 });
 
 // Wallet deposit
@@ -377,7 +587,7 @@ app.get('/api/matches/:id', (req, res) => {
   res.json(match);
 });
 
-// Create new 1v1 match challenge
+// Create new 1v1 match challenge (Creator generates link with ₦0 upfront)
 app.post('/api/matches', (req, res) => {
   const {
     creatorId,
@@ -402,36 +612,18 @@ app.post('/api/matches', (req, res) => {
     return res.status(400).json({ error: 'Minimum stake is ₦1,000' });
   }
 
-  if (creator.balance < numStake) {
-    return res.status(400).json({
-      error: `Insufficient balance (₦${creator.balance.toLocaleString()}). Please fund your wallet with at least ₦${numStake.toLocaleString()} to create this bet.`,
-    });
-  }
-
-  // Deduct stake from creator available balance and lock in escrow
-  creator.balance -= numStake;
-  creator.escrowBalance += numStake;
-
   const matchId = `match_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-  const roomCode = generateRoomCode(map);
+  const challengeCode = `CHALLENGE-${Math.floor(1000 + Math.random() * 9000)}`;
   const potAmount = numStake * 2;
   const rakeRate = getRakePercentage(numStake);
   const platformFee = Math.round(potAmount * rakeRate);
   const winnerPayout = potAmount - platformFee;
   const platformFeePercentage = Math.round(rakeRate * 100);
 
-  creator.transactions.unshift({
-    id: `tx_${Date.now()}`,
-    type: 'ESCROW_LOCK',
-    amount: numStake,
-    description: `₦${numStake.toLocaleString()} staked into escrow for 1v1 match #${roomCode}`,
-    timestamp: Date.now(),
-    matchId,
-  });
-
-  const newMatch: Match = {
+  const newMatch: any = {
     id: matchId,
-    roomCode,
+    challengeCode,
+    roomCode: undefined, // Room code is generated ONLY after both players pay their stakes
     gameMode,
     map,
     rules,
@@ -440,7 +632,7 @@ app.post('/api/matches', (req, res) => {
     platformFeePercentage,
     platformFee,
     winnerPayout,
-    status: 'PENDING_OPPONENT',
+    status: 'PENDING_OPPONENT_STAKE',
     createdAt: Date.now(),
     creator: {
       id: creator.id,
@@ -448,33 +640,34 @@ app.post('/api/matches', (req, res) => {
       codmIgn: creator.codmIgn,
       codmUid: creator.codmUid,
       avatar: creator.avatar,
-      staked: true,
+      staked: false, // Creator has not paid yet
     },
     chatMessages: [
       {
         id: `msg_sys_1`,
         senderId: 'SYSTEM',
         senderName: 'CODM Referee Bot',
-        text: `Match room created with ₦${numStake.toLocaleString()} stake (Pot: ₦${potAmount.toLocaleString()}, ${platformFeePercentage}% Tiered Rake: ₦${platformFee.toLocaleString()}, Winner Payout: ₦${winnerPayout.toLocaleString()}). Share the invite link with your opponent.`,
+        text: `Match challenge #${challengeCode} created with ₦${numStake.toLocaleString()} stake (Pot: ₦${potAmount.toLocaleString()}, Winner Payout: ₦${winnerPayout.toLocaleString()}). Share the invite link with your opponent. When your opponent accepts and sends their stake, you will be prompted to send your matching stake to generate your CODM in-game room number.`,
         timestamp: Date.now(),
       },
     ],
   };
 
   matches[matchId] = newMatch;
+  syncMatchToDb(newMatch);
   res.json(newMatch);
 });
 
-// Join/Accept match challenge (Opponent)
-app.post('/api/matches/:id/join', (req, res) => {
+// Opponent accepts challenge and sends stake into escrow
+app.post('/api/matches/:id/opponent-stake', (req, res) => {
   const match = matches[req.params.id];
   if (!match) return res.status(404).json({ error: 'Match not found' });
 
-  if (match.status !== 'PENDING_OPPONENT') {
-    return res.status(400).json({ error: 'This match is no longer open for joining.' });
+  if (match.status !== 'PENDING_OPPONENT_STAKE') {
+    return res.status(400).json({ error: 'This match challenge is no longer open for joining.' });
   }
 
-  const { opponentId } = req.body;
+  const { opponentId, paymentMethod = 'bank_transfer' } = req.body;
   const opponent = users[opponentId];
   if (!opponent) return res.status(404).json({ error: 'Opponent not found' });
 
@@ -482,21 +675,23 @@ app.post('/api/matches/:id/join', (req, res) => {
     return res.status(400).json({ error: 'You cannot accept your own challenge. Share the link with an opponent!' });
   }
 
-  if (opponent.balance < match.stakeAmount) {
-    return res.status(400).json({
-      error: `Insufficient balance (₦${opponent.balance.toLocaleString()}). You need ₦${match.stakeAmount.toLocaleString()} to accept this stake. Please fund your wallet.`,
-    });
+  // If paying with existing balance
+  if (paymentMethod === 'wallet_balance') {
+    if (opponent.balance < match.stakeAmount) {
+      return res.status(400).json({ error: `Insufficient balance (₦${opponent.balance.toLocaleString()}).` });
+    }
+    opponent.balance -= match.stakeAmount;
+    opponent.escrowBalance += match.stakeAmount;
+  } else {
+    // Direct escrow payment
+    opponent.escrowBalance += match.stakeAmount;
   }
-
-  // Deduct stake from opponent available balance and lock in escrow
-  opponent.balance -= match.stakeAmount;
-  opponent.escrowBalance += match.stakeAmount;
 
   opponent.transactions.unshift({
     id: `tx_${Date.now()}`,
     type: 'ESCROW_LOCK',
     amount: match.stakeAmount,
-    description: `₦${match.stakeAmount.toLocaleString()} deducted & locked in escrow for 1v1 match #${match.roomCode}`,
+    description: `₦${match.stakeAmount.toLocaleString()} stake locked in escrow for challenge #${match.challengeCode}`,
     timestamp: Date.now(),
     matchId: match.id,
   });
@@ -510,13 +705,119 @@ app.post('/api/matches/:id/join', (req, res) => {
     staked: true,
   };
 
+  match.status = 'OPPONENT_STAKED_AWAITING_CREATOR';
+
+  match.chatMessages.push({
+    id: `msg_${Date.now()}`,
+    senderId: 'SYSTEM',
+    senderName: 'CODM Referee Bot',
+    text: `⚔️ Challenge accepted! ${opponent.codmIgn} has sent ₦${match.stakeAmount.toLocaleString()} into escrow. Host ${match.creator.codmIgn}, please send your matching ₦${match.stakeAmount.toLocaleString()} stake to generate your CODM in-game room number!`,
+    timestamp: Date.now(),
+  });
+
+  syncMatchToDb(match);
+  res.json(match);
+});
+
+// Creator sends matching stake after opponent has accepted
+app.post('/api/matches/:id/creator-stake', (req, res) => {
+  const match = matches[req.params.id];
+  if (!match) return res.status(404).json({ error: 'Match not found' });
+
+  if (match.status !== 'OPPONENT_STAKED_AWAITING_CREATOR') {
+    return res.status(400).json({ error: 'Match is not in waiting for host stake state.' });
+  }
+
+  const { creatorId, paymentMethod = 'bank_transfer' } = req.body;
+  const creator = users[creatorId];
+  if (!creator) return res.status(404).json({ error: 'Creator not found' });
+
+  if (creator.id !== match.creator.id) {
+    return res.status(403).json({ error: 'Only the match creator can provide the matching host stake.' });
+  }
+
+  if (paymentMethod === 'wallet_balance') {
+    if (creator.balance < match.stakeAmount) {
+      return res.status(400).json({ error: `Insufficient balance (₦${creator.balance.toLocaleString()}).` });
+    }
+    creator.balance -= match.stakeAmount;
+    creator.escrowBalance += match.stakeAmount;
+  } else {
+    creator.escrowBalance += match.stakeAmount;
+  }
+
+  creator.transactions.unshift({
+    id: `tx_${Date.now()}`,
+    type: 'ESCROW_LOCK',
+    amount: match.stakeAmount,
+    description: `₦${match.stakeAmount.toLocaleString()} matching stake locked in escrow for challenge #${match.challengeCode}`,
+    timestamp: Date.now(),
+    matchId: match.id,
+  });
+
+  match.creator.staked = true;
+
+  // Both players have now staked! System generates the official in-game CODM room number!
+  const generatedRoomCode = generateRoomCode(match.map);
+  match.roomCode = generatedRoomCode;
+  match.roomGeneratedAt = Date.now();
   match.status = 'READY_TO_PLAY';
 
   match.chatMessages.push({
     id: `msg_${Date.now()}`,
     senderId: 'SYSTEM',
     senderName: 'CODM Referee Bot',
-    text: `⚔️ Challenge accepted! Both players staked ₦${match.stakeAmount.toLocaleString()} each (Total Pot: ₦${match.potAmount.toLocaleString()} in escrow). Custom Room Code is: ${match.roomCode}. Go to CODM Private Room and start the match!`,
+    text: `🎉 BOTH STAKES CONFIRMED! Total Pot: ₦${match.potAmount.toLocaleString()} secured in automated escrow. 🎯 IN-GAME ROOM NUMBER GENERATED: ${generatedRoomCode}. Both players: open CODM > Multiplayer > Private Match > Join #${generatedRoomCode} and battle!`,
+    timestamp: Date.now(),
+  });
+
+  syncMatchToDb(match);
+  res.json(match);
+});
+
+// Legacy / Direct Join handler (maps to opponent-stake)
+app.post('/api/matches/:id/join', (req, res) => {
+  const match = matches[req.params.id];
+  if (!match) return res.status(404).json({ error: 'Match not found' });
+
+  if (match.status !== 'PENDING_OPPONENT_STAKE') {
+    return res.status(400).json({ error: 'This match is no longer open for joining.' });
+  }
+
+  const { opponentId } = req.body;
+  const opponent = users[opponentId];
+  if (!opponent) return res.status(404).json({ error: 'Opponent not found' });
+
+  if (opponent.id === match.creator.id) {
+    return res.status(400).json({ error: 'You cannot accept your own challenge. Share the link with an opponent!' });
+  }
+
+  opponent.escrowBalance += match.stakeAmount;
+  opponent.transactions.unshift({
+    id: `tx_${Date.now()}`,
+    type: 'ESCROW_LOCK',
+    amount: match.stakeAmount,
+    description: `₦${match.stakeAmount.toLocaleString()} stake locked in escrow for challenge #${match.challengeCode}`,
+    timestamp: Date.now(),
+    matchId: match.id,
+  });
+
+  match.opponent = {
+    id: opponent.id,
+    username: opponent.username,
+    codmIgn: opponent.codmIgn,
+    codmUid: opponent.codmUid,
+    avatar: opponent.avatar,
+    staked: true,
+  };
+
+  match.status = 'OPPONENT_STAKED_AWAITING_CREATOR';
+
+  match.chatMessages.push({
+    id: `msg_${Date.now()}`,
+    senderId: 'SYSTEM',
+    senderName: 'CODM Referee Bot',
+    text: `⚔️ Challenge accepted! ${opponent.codmIgn} has sent ₦${match.stakeAmount.toLocaleString()} into escrow. Host ${match.creator.codmIgn}, send your matching ₦${match.stakeAmount.toLocaleString()} stake to generate your CODM in-game room number!`,
     timestamp: Date.now(),
   });
 
@@ -548,27 +849,47 @@ app.post('/api/matches/:id/chat', (req, res) => {
   res.json(newMsg);
 });
 
-// Cancel match (only if PENDING_OPPONENT)
+// Cancel match (only if PENDING_OPPONENT_STAKE or OPPONENT_STAKED_AWAITING_CREATOR)
 app.post('/api/matches/:id/cancel', (req, res) => {
   const match = matches[req.params.id];
   if (!match) return res.status(404).json({ error: 'Match not found' });
 
-  if (match.status !== 'PENDING_OPPONENT') {
-    return res.status(400).json({ error: 'Cannot cancel match after an opponent has joined or match has started' });
+  if (match.status !== 'PENDING_OPPONENT_STAKE' && match.status !== 'OPPONENT_STAKED_AWAITING_CREATOR') {
+    return res.status(400).json({ error: 'Cannot cancel match after both players have locked stakes' });
   }
 
-  const creator = users[match.creator.id];
-  if (creator) {
-    creator.balance += match.stakeAmount;
-    creator.escrowBalance = Math.max(0, creator.escrowBalance - match.stakeAmount);
-    creator.transactions.unshift({
-      id: `tx_${Date.now()}`,
-      type: 'ESCROW_REFUND',
-      amount: match.stakeAmount,
-      description: `₦${match.stakeAmount.toLocaleString()} escrow refunded from cancelled match #${match.roomCode}`,
-      timestamp: Date.now(),
-      matchId: match.id,
-    });
+  // Refund creator if staked
+  if (match.creator.staked) {
+    const creator = users[match.creator.id];
+    if (creator) {
+      creator.balance += match.stakeAmount;
+      creator.escrowBalance = Math.max(0, creator.escrowBalance - match.stakeAmount);
+      creator.transactions.unshift({
+        id: `tx_${Date.now()}_c`,
+        type: 'ESCROW_REFUND',
+        amount: match.stakeAmount,
+        description: `₦${match.stakeAmount.toLocaleString()} escrow refunded from cancelled challenge #${match.challengeCode}`,
+        timestamp: Date.now(),
+        matchId: match.id,
+      });
+    }
+  }
+
+  // Refund opponent if staked
+  if (match.opponent?.staked) {
+    const opponent = users[match.opponent.id];
+    if (opponent) {
+      opponent.balance += match.stakeAmount;
+      opponent.escrowBalance = Math.max(0, opponent.escrowBalance - match.stakeAmount);
+      opponent.transactions.unshift({
+        id: `tx_${Date.now()}_o`,
+        type: 'ESCROW_REFUND',
+        amount: match.stakeAmount,
+        description: `₦${match.stakeAmount.toLocaleString()} escrow refunded from cancelled challenge #${match.challengeCode}`,
+        timestamp: Date.now(),
+        matchId: match.id,
+      });
+    }
   }
 
   match.status = 'CANCELLED';
@@ -877,6 +1198,10 @@ app.post('/api/matches/:id/admin-resolve', (req, res) => {
 });
 
 async function startServer() {
+  // 1. Initialize Supabase PostgreSQL database and load state
+  await initDatabase();
+  await loadDataFromSupabase();
+
   // Always serve static public assets (images, icons, etc.)
   const publicPath = path.resolve(__dirname, 'public');
   if (fs.existsSync(publicPath)) {

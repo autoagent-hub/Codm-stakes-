@@ -27,9 +27,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
 }) => {
   const [copiedCode, setCopiedCode] = React.useState<string | null>(null);
 
-  const openMatches = matches.filter((m) => m.status === 'PENDING_OPPONENT');
+  const openMatches = matches.filter((m) => m.status === 'PENDING_OPPONENT_STAKE');
   const activeMatches = matches.filter((m) =>
-    ['READY_TO_PLAY', 'IN_PROGRESS', 'SUBMITTING_RESULTS', 'VERIFYING', 'DISPUTED'].includes(m.status)
+    ['OPPONENT_STAKED_AWAITING_CREATOR', 'READY_TO_PLAY', 'IN_PROGRESS', 'SUBMITTING_RESULTS', 'VERIFYING', 'DISPUTED'].includes(m.status)
   );
   const settledMatches = matches.filter((m) => m.status === 'SETTLED');
 
@@ -172,35 +172,50 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {activeMatches.map((m) => (
-              <div
-                key={m.id}
-                onClick={() => onSelectMatch(m.id)}
-                className="p-4 rounded-2xl bg-neutral-900 border border-amber-500/40 hover:border-amber-400 transition-all cursor-pointer shadow-lg group flex items-center justify-between"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
-                    <Swords className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-bold text-white font-mono-nums">{m.roomCode}</span>
-                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 uppercase">
-                        {m.status.replace('_', ' ')}
-                      </span>
-                    </div>
-                    <div className="text-xs text-neutral-400">
-                      {m.creator.codmIgn} vs {m.opponent?.codmIgn || 'Opponent'}
-                    </div>
-                  </div>
-                </div>
+            {activeMatches.map((m) => {
+              const isCreator = m.creator.id === currentUser.id;
+              const isAwaitingHostStake = m.status === 'OPPONENT_STAKED_AWAITING_CREATOR';
 
-                <div className="text-right">
-                  <div className="text-xs text-neutral-400 font-mono-nums">POT</div>
-                  <div className="text-sm font-black text-amber-400 font-mono-nums">₦{m.potAmount.toLocaleString()}</div>
+              return (
+                <div
+                  key={m.id}
+                  onClick={() => onSelectMatch(m.id)}
+                  className={`p-4 rounded-2xl bg-neutral-900 border transition-all cursor-pointer shadow-lg group flex items-center justify-between ${
+                    isAwaitingHostStake && isCreator
+                      ? 'border-amber-400 ring-1 ring-amber-400 animate-pulse'
+                      : 'border-amber-500/40 hover:border-amber-400'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                      <Swords className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold text-white font-mono-nums">
+                          {m.roomCode ? `#${m.roomCode}` : m.challengeCode}
+                        </span>
+                        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border uppercase ${
+                          isAwaitingHostStake && isCreator
+                            ? 'bg-amber-400 text-neutral-950 border-amber-400 font-bold'
+                            : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                        }`}>
+                          {isAwaitingHostStake && isCreator ? 'Action: Send Stake' : m.status.replace(/_/g, ' ')}
+                        </span>
+                      </div>
+                      <div className="text-xs text-neutral-400">
+                        {m.creator.codmIgn} vs {m.opponent?.codmIgn || 'Opponent'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="text-right">
+                    <div className="text-xs text-neutral-400 font-mono-nums">POT</div>
+                    <div className="text-sm font-black text-amber-400 font-mono-nums">₦{m.potAmount.toLocaleString()}</div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -256,14 +271,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     <div className="flex items-center justify-between mb-2.5">
                       <div className="flex items-center gap-1.5">
                         <span className="font-mono-nums text-xs font-bold text-white bg-neutral-800 px-2 py-0.5 rounded-md">
-                          {m.roomCode}
+                          {m.roomCode || m.challengeCode}
                         </span>
                         <button
-                          onClick={(e) => copyRoomCode(m.roomCode, e)}
+                          onClick={(e) => copyRoomCode(m.roomCode || m.challengeCode, e)}
                           className="p-1 text-neutral-400 hover:text-amber-400 transition-colors"
-                          title="Copy room code"
+                          title="Copy code"
                         >
-                          {copiedCode === m.roomCode ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                          {copiedCode === (m.roomCode || m.challengeCode) ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                         </button>
                       </div>
 
