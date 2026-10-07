@@ -95,17 +95,17 @@ export const CreateBetModal: React.FC<CreateBetModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="relative w-full max-w-lg bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/85 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="relative w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
         {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-neutral-800 bg-neutral-950/80">
+        <div className="flex items-center justify-between p-4 border-b border-neutral-800 bg-neutral-950/80">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
               <Swords className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-base sm:text-lg font-bold font-heading text-white">Create Custom Match Wager</h2>
-              <p className="text-xs text-neutral-400">Set your own game mode, map, and rules in escrow</p>
+              <h2 className="text-sm font-bold font-heading text-white">Create Custom Match Wager</h2>
+              <p className="text-[11px] text-neutral-400 font-mono-nums">Balance: <strong className="text-emerald-400">₦{currentUser.balance.toLocaleString()}</strong></p>
             </div>
           </div>
           <button
@@ -117,7 +117,7 @@ export const CreateBetModal: React.FC<CreateBetModalProps> = ({
         </div>
 
         {/* Body */}
-        <div className="p-5 overflow-y-auto space-y-5">
+        <div className="p-4 overflow-y-auto space-y-4">
           {error && (
             <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />

@@ -1,28 +1,44 @@
 import React, { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { UserProfile, Match } from './types';
 import {
   fetchUser, fetchMatches, fetchMatch, createMatch, joinMatch,
   opponentStakeMatch, creatorStakeMatch,
   cancelMatch, submitMatchResult,
-  createUser, signUpUser, signInUser, updateUser, DEFAULT_USERS
+  createUser, signUpUser, signInUser, updateUser
 } from './services/api';
-import { Navbar, NavigationTab } from './components/Navbar';
+import { Navbar } from './components/Navbar';
 import { BottomNavbar } from './components/BottomNavbar';
 import { LandingPage } from './components/LandingPage';
 import { AuthPage } from './components/AuthPage';
 import { CoreArena } from './components/CoreArena';
-import { LeaderboardPage } from './components/LeaderboardPage';
 import { RulesPage } from './components/RulesPage';
 import { HistoryPage } from './components/HistoryPage';
 import { ProfilePage } from './components/ProfilePage';
 import { CreateBetModal } from './components/CreateBetModal';
 import { OpponentOnboardingModal } from './components/OpponentOnboardingModal';
 
-export default function App() {
-  const [currentUser, setCurrentUser] = useState<UserProfile>(DEFAULT_USERS.user_ghost);
-  const [allUsers, setAllUsers] = useState<Record<string, UserProfile>>(DEFAULT_USERS);
+function MainApp() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const [currentUser, setCurrentUser] = useState<UserProfile>({
+    id: 'guest',
+    username: 'Gamer',
+    codmIgn: 'CODM_Gamer',
+    codmUid: '0000000000000000',
+    email: '',
+    phone: '',
+    balance: 0,
+    escrowBalance: 0,
+    totalWinnings: 0,
+    wins: 0,
+    losses: 0,
+    draws: 0,
+    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=gamer',
+    transactions: [],
+  });
   const [matches, setMatches] = useState<Match[]>([]);
-  const [currentTab, setCurrentTab] = useState<NavigationTab>('landing');
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signup');
 
   // Modals & configuration
@@ -31,6 +47,15 @@ export default function App() {
   const [createBetInitialStake, setCreateBetInitialStake] = useState<number | undefined>(undefined);
   const [isOnboardingModalOpen, setIsOnboardingModalOpen] = useState(false);
   const [onboardingTargetMatch, setOnboardingTargetMatch] = useState<Match | null>(null);
+
+  // Determine current tab from pathname
+  const pathname = location.pathname;
+  let currentTab = 'landing';
+  if (pathname === '/auth') currentTab = 'auth';
+  else if (pathname === '/arena') currentTab = 'arena';
+  else if (pathname === '/rules') currentTab = 'rules';
+  else if (pathname === '/history') currentTab = 'history';
+  else if (pathname === '/profile') currentTab = 'profile';
 
   // Initial Data Fetch & URL Deep Link Check
   useEffect(() => {
@@ -47,23 +72,25 @@ export default function App() {
   const loadInitialSessionAndData = async () => {
     try {
       const savedUserId = localStorage.getItem('codm_current_user_id');
-      let activeUser = currentUser;
       if (savedUserId) {
         try {
-          activeUser = await fetchUser(savedUserId);
+          const activeUser = await fetchUser(savedUserId);
           setCurrentUser(activeUser);
-          setCurrentTab('arena');
+          if (window.location.pathname === '/' || window.location.pathname === '/landing') {
+            navigate('/arena');
+          }
         } catch (e) {
           console.error('Could not load saved user:', e);
+          navigate('/auth');
         }
       } else {
-        const u = await fetchUser(currentUser.id);
-        setCurrentUser(u);
+        navigate('/auth');
       }
       const mList = await fetchMatches();
       setMatches(mList);
     } catch (e) {
       console.error(e);
+      navigate('/auth');
     }
   };
 
@@ -86,7 +113,7 @@ export default function App() {
         setOnboardingTargetMatch(match);
         setIsOnboardingModalOpen(true);
       } else if (match) {
-        setCurrentTab('arena');
+        navigate('/arena');
       }
     } catch (err) {
       console.error('Deep link match lookup error:', err);
@@ -115,12 +142,11 @@ export default function App() {
 
     const updatedUser = await fetchUser(currentUser.id);
     setCurrentUser(updatedUser);
-    setAllUsers((prev) => ({ ...prev, [currentUser.id]: updatedUser }));
     await loadData();
     setIsCreateBetOpen(false);
     setCreateBetInitialMode(undefined);
     setCreateBetInitialStake(undefined);
-    setCurrentTab('arena'); // Navigate immediately into active room view
+    navigate('/arena'); // Navigate immediately into active room view
   };
 
   const handleJoinMatch = async (matchId: string, opponentId: string) => {
@@ -128,9 +154,8 @@ export default function App() {
       await joinMatch(matchId, opponentId);
       const updatedUser = await fetchUser(currentUser.id);
       setCurrentUser(updatedUser);
-      setAllUsers((prev) => ({ ...prev, [currentUser.id]: updatedUser }));
       await loadData();
-      setCurrentTab('arena');
+      navigate('/arena');
     } catch (err: any) {
       alert(err.message || 'Failed to join match');
     }
@@ -146,7 +171,6 @@ export default function App() {
     });
     const updatedUser = await fetchUser(currentUser.id);
     setCurrentUser(updatedUser);
-    setAllUsers((prev) => ({ ...prev, [currentUser.id]: updatedUser }));
     await loadData();
   };
 
@@ -160,16 +184,10 @@ export default function App() {
     });
     const updatedUser = await fetchUser(currentUser.id);
     setCurrentUser(updatedUser);
-    setAllUsers((prev) => ({ ...prev, [currentUser.id]: updatedUser }));
     await loadData();
   };
 
   const handleSimulateOpponentStake = async (matchId: string) => {
-    const shadowUser = DEFAULT_USERS.user_shadow;
-    await opponentStakeMatch(matchId, {
-      opponentId: shadowUser.id,
-      paymentMethod: 'bank_transfer',
-    });
     await loadData();
   };
 
@@ -180,19 +198,16 @@ export default function App() {
     phone: string;
     initialDeposit?: number;
   }) => {
-    // 1. Create new user profile with ₦0 initial deposit
     const newUser = await createUser({
       ...userData,
       initialDeposit: userData.initialDeposit || 0,
     });
 
-    // 2. Set as active user
-    setAllUsers((prev) => ({ ...prev, [newUser.id]: newUser }));
     setCurrentUser(newUser);
-
+    localStorage.setItem('codm_current_user_id', newUser.id);
     await loadData();
     setOnboardingTargetMatch(null);
-    setCurrentTab('arena');
+    navigate('/arena');
   };
 
   const handleSubmitResult = async (matchId: string, claim: 'VICTORY' | 'DEFEAT' | 'DRAW', screenshotBase64?: string) => {
@@ -203,7 +218,6 @@ export default function App() {
     });
     const updatedUser = await fetchUser(currentUser.id);
     setCurrentUser(updatedUser);
-    setAllUsers((prev) => ({ ...prev, [currentUser.id]: updatedUser }));
     await loadData();
   };
 
@@ -211,7 +225,6 @@ export default function App() {
     await cancelMatch(matchId);
     const updatedUser = await fetchUser(currentUser.id);
     setCurrentUser(updatedUser);
-    setAllUsers((prev) => ({ ...prev, [currentUser.id]: updatedUser }));
     await loadData();
   };
 
@@ -225,9 +238,8 @@ export default function App() {
     const user = await signUpUser(data);
     localStorage.setItem('codm_current_user_id', user.id);
     setCurrentUser(user);
-    setAllUsers((prev) => ({ ...prev, [user.id]: user }));
     await loadData(user.id);
-    setCurrentTab('arena');
+    navigate('/arena');
   };
 
   const handleSignIn = async (data: {
@@ -238,25 +250,27 @@ export default function App() {
     localStorage.setItem('codm_current_user_id', user.id);
     setCurrentUser(user);
     await loadData(user.id);
-    setCurrentTab('arena');
+    navigate('/arena');
   };
 
   const handleSignOut = () => {
     localStorage.removeItem('codm_current_user_id');
-    setCurrentUser(DEFAULT_USERS.user_ghost);
-    setCurrentTab('landing');
+    navigate('/auth');
   };
 
   const handleUpdateUser = async (updatedData: Partial<UserProfile>) => {
     try {
       const saved = await updateUser(currentUser.id, updatedData);
       setCurrentUser(saved);
-      setAllUsers((prev) => ({ ...prev, [currentUser.id]: saved }));
     } catch (err) {
       const updated = { ...currentUser, ...updatedData };
       setCurrentUser(updated);
-      setAllUsers((prev) => ({ ...prev, [currentUser.id]: updated }));
     }
+  };
+
+  const handleNavigate = (tab: string) => {
+    if (tab === 'landing') navigate('/');
+    else navigate(`/${tab}`);
   };
 
   // 1. STANDALONE SEPARATED LANDING PAGE VIEW
@@ -267,113 +281,127 @@ export default function App() {
           matches={matches}
           onOpenAuth={(mode) => {
             setAuthMode(mode || 'signup');
-            setCurrentTab('auth');
+            navigate('/auth');
           }}
         />
       </div>
     );
   }
 
-  // 2. AUTHENTICATION (SIGN UP & SIGN IN) PAGE VIEW
+  // 2. AUTHENTICATION PAGE VIEW
   if (currentTab === 'auth') {
     return (
       <AuthPage
         initialMode={authMode}
         onSignUp={handleSignUp}
         onSignIn={handleSignIn}
-        onBackToLanding={() => setCurrentTab('landing')}
-        demoUsers={allUsers}
+        onBackToLanding={() => navigate('/')}
+        demoUsers={{}}
       />
     );
   }
 
-  // 3. IN-APP PAGES WITH TOP NAVBAR & BOTTOM DOCK
+  // 3. IN-APP PAGES WITH ROUTING & NAVBAR / BOTTOM DOCK
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 flex flex-col bg-tactical-grid selection:bg-amber-500 selection:text-black relative">
-      {/* Top Navigation Bar */}
       <Navbar
         currentUser={currentUser}
         currentTab={currentTab}
-        setCurrentTab={setCurrentTab}
+        onNavigate={handleNavigate}
         openCreateBetModal={() => handleOpenCreateBet()}
         onSignOut={handleSignOut}
       />
 
-      {/* Main Separate Page Content */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-28">
-        {/* PAGE 1: ARENA / DASHBOARD */}
-        {currentTab === 'arena' && (
-          <CoreArena
-            currentUser={currentUser}
-            matches={matches}
-            onCreateBet={handleCreateBet}
-            onJoinMatch={handleJoinMatch}
-            onOpponentStake={handleOpponentStake}
-            onCreatorStake={handleCreatorStake}
-            onSimulateOpponentStake={handleSimulateOpponentStake}
-            onSubmitResult={handleSubmitResult}
-            onCancelMatch={handleCancelMatch}
-            onRefresh={loadData}
-            onOpenCreateBet={handleOpenCreateBet}
-            onOpenNewUserOnboarding={(targetMatch) => {
-              setOnboardingTargetMatch(targetMatch || null);
-              setIsOnboardingModalOpen(true);
-            }}
+        <Routes>
+          <Route
+            path="/arena"
+            element={
+              <CoreArena
+                currentUser={currentUser}
+                matches={matches}
+                onCreateBet={handleCreateBet}
+                onJoinMatch={handleJoinMatch}
+                onOpponentStake={handleOpponentStake}
+                onCreatorStake={handleCreatorStake}
+                onSimulateOpponentStake={handleSimulateOpponentStake}
+                onSubmitResult={handleSubmitResult}
+                onCancelMatch={handleCancelMatch}
+                onRefresh={loadData}
+                onOpenCreateBet={handleOpenCreateBet}
+                onOpenNewUserOnboarding={(targetMatch) => {
+                  setOnboardingTargetMatch(targetMatch || null);
+                  setIsOnboardingModalOpen(true);
+                }}
+              />
+            }
           />
-        )}
-
-        {/* PAGE 2: LEADERBOARD & RANKINGS */}
-        {currentTab === 'leaderboard' && (
-          <LeaderboardPage
-            currentUser={currentUser}
-            matches={matches}
-            onOpenCreateBet={handleOpenCreateBet}
-            onNavigateToArena={() => setCurrentTab('arena')}
+          <Route
+            path="/rules"
+            element={
+              <RulesPage
+                onOpenCreateBet={handleOpenCreateBet}
+                onNavigateToArena={() => navigate('/arena')}
+              />
+            }
           />
-        )}
-
-        {/* PAGE 3: RULES & FAIR PLAY HANDBOOK */}
-        {currentTab === 'rules' && (
-          <RulesPage
-            onOpenCreateBet={handleOpenCreateBet}
-            onNavigateToArena={() => setCurrentTab('arena')}
+          <Route
+            path="/history"
+            element={
+              <HistoryPage
+                currentUser={currentUser}
+                matches={matches}
+                onNavigateToArena={() => navigate('/arena')}
+                onOpenCreateBet={handleOpenCreateBet}
+              />
+            }
           />
-        )}
-
-        {/* PAGE 4: MATCH HISTORY & LEDGER */}
-        {currentTab === 'history' && (
-          <HistoryPage
-            currentUser={currentUser}
-            matches={matches}
-            onNavigateToArena={() => setCurrentTab('arena')}
-            onOpenCreateBet={handleOpenCreateBet}
+          <Route
+            path="/profile"
+            element={
+              <ProfilePage
+                currentUser={currentUser}
+                matches={matches}
+                onUpdateUser={handleUpdateUser}
+                onNavigateToArena={() => navigate('/arena')}
+                onNavigateToHistory={() => navigate('/history')}
+                onNavigateToRules={() => navigate('/rules')}
+                onOpenCreateBet={handleOpenCreateBet}
+                onSignOut={handleSignOut}
+              />
+            }
           />
-        )}
-
-        {/* PAGE 5: GAMER PROFILE */}
-        {currentTab === 'profile' && (
-          <ProfilePage
-            currentUser={currentUser}
-            matches={matches}
-            onUpdateUser={handleUpdateUser}
-            onNavigateToArena={() => setCurrentTab('arena')}
-            onNavigateToHistory={() => setCurrentTab('history')}
-            onNavigateToLeaderboard={() => setCurrentTab('leaderboard')}
-            onNavigateToRules={() => setCurrentTab('rules')}
-            onOpenCreateBet={handleOpenCreateBet}
-            onSignOut={handleSignOut}
+          <Route
+            path="*"
+            element={
+              <CoreArena
+                currentUser={currentUser}
+                matches={matches}
+                onCreateBet={handleCreateBet}
+                onJoinMatch={handleJoinMatch}
+                onOpponentStake={handleOpponentStake}
+                onCreatorStake={handleCreatorStake}
+                onSimulateOpponentStake={handleSimulateOpponentStake}
+                onSubmitResult={handleSubmitResult}
+                onCancelMatch={handleCancelMatch}
+                onRefresh={loadData}
+                onOpenCreateBet={handleOpenCreateBet}
+                onOpenNewUserOnboarding={(targetMatch) => {
+                  setOnboardingTargetMatch(targetMatch || null);
+                  setIsOnboardingModalOpen(true);
+                }}
+              />
+            }
           />
-        )}
+        </Routes>
       </main>
 
-      {/* Fixed Bottom Navigation Dock for Mobile & Quick Switching */}
       <BottomNavbar
         currentUser={currentUser}
         currentTab={currentTab}
-        setCurrentTab={setCurrentTab}
+        onNavigate={handleNavigate}
       />
 
-      {/* App Footer */}
       <footer className="border-t border-neutral-900 bg-neutral-950 py-6 mt-auto">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-neutral-500">
           <div className="flex items-center gap-2">
@@ -391,7 +419,6 @@ export default function App() {
         </div>
       </footer>
 
-      {/* Bet Creation Modal */}
       <CreateBetModal
         currentUser={currentUser}
         isOpen={isCreateBetOpen}
@@ -405,7 +432,6 @@ export default function App() {
         onSubmit={handleCreateBet}
       />
 
-      {/* Opponent Onboarding Modal (For new players joining from invite link) */}
       <OpponentOnboardingModal
         match={onboardingTargetMatch}
         isOpen={isOnboardingModalOpen}
@@ -416,5 +442,15 @@ export default function App() {
         onCompleteOnboarding={handleCompleteOnboarding}
       />
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/*" element={<MainApp />} />
+      </Routes>
+    </BrowserRouter>
   );
 }

@@ -13,7 +13,6 @@ interface ProfilePageProps {
   onUpdateUser?: (updated: Partial<UserProfile>) => Promise<void>;
   onNavigateToArena: () => void;
   onNavigateToHistory: () => void;
-  onNavigateToLeaderboard: () => void;
   onNavigateToRules: () => void;
   onOpenCreateBet: (mode?: string, stake?: number) => void;
   onSignOut?: () => void;
@@ -33,7 +32,6 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
   onUpdateUser,
   onNavigateToArena,
   onNavigateToHistory,
-  onNavigateToLeaderboard,
   onNavigateToRules,
   onOpenCreateBet,
   onSignOut,
@@ -43,6 +41,9 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
   const [editUid, setEditUid] = useState(currentUser.codmUid);
   const [editEmail, setEditEmail] = useState(currentUser.email);
   const [editPhone, setEditPhone] = useState(currentUser.phone);
+  const [editBankName, setEditBankName] = useState(currentUser.bankName || '');
+  const [editAccountNumber, setEditAccountNumber] = useState(currentUser.accountNumber || '');
+  const [editAccountName, setEditAccountName] = useState(currentUser.accountName || '');
   const [selectedAvatar, setSelectedAvatar] = useState(currentUser.avatar);
   const [copiedUid, setCopiedUid] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -70,6 +71,9 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
         codmUid: editUid.trim() || currentUser.codmUid,
         email: editEmail.trim() || currentUser.email,
         phone: editPhone.trim() || currentUser.phone,
+        bankName: editBankName.trim() || undefined,
+        accountNumber: editAccountNumber.trim() || undefined,
+        accountName: editAccountName.trim() || undefined,
         avatar: selectedAvatar,
       });
     }
@@ -291,6 +295,50 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
               </div>
             </div>
 
+            {/* Saved Bank Details for Payouts */}
+            <div className="p-4 rounded-2xl bg-neutral-950 border border-amber-500/30 space-y-3">
+              <div className="text-xs font-bold text-amber-400 uppercase tracking-wider font-mono flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4" />
+                <span>Saved Bank Details for Automated Payouts</span>
+              </div>
+              <p className="text-[11px] text-neutral-400">
+                When you win a 1v1 match, winnings are automatically disbursed to your saved bank account.
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="text-[11px] text-neutral-400 block mb-1">Bank Name</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. OPay, GTBank, Kuda"
+                    value={editBankName}
+                    onChange={(e) => setEditBankName(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-white text-xs focus:border-amber-400 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] text-neutral-400 block mb-1">Account Number</label>
+                  <input
+                    type="text"
+                    placeholder="0123456789"
+                    value={editAccountNumber}
+                    onChange={(e) => setEditAccountNumber(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-white text-xs font-mono-nums focus:border-amber-400 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] text-neutral-400 block mb-1">Account Name</label>
+                  <input
+                    type="text"
+                    placeholder="Full legal name"
+                    value={editAccountName}
+                    onChange={(e) => setEditAccountName(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-white text-xs focus:border-amber-400 focus:outline-none"
+                  />
+                </div>
+              </div>
+            </div>
+
             <div className="flex justify-end gap-3 pt-2">
               <button
                 type="button"
@@ -342,7 +390,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
       {/* ------------------------------------------------------------- */}
       {/* 4. DEDICATED SEPARATE TAB LINKS                               */}
       {/* ------------------------------------------------------------- */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div
           onClick={onNavigateToArena}
           className="p-5 rounded-2xl bg-neutral-900 border border-neutral-800 hover:border-amber-400/60 transition-all cursor-pointer group space-y-2.5"
@@ -354,21 +402,6 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
             <h4 className="font-heading font-black text-sm text-white uppercase">Arena & Challenges</h4>
             <p className="text-xs text-neutral-400 mt-0.5">
               Create custom wagers, jump into active battles, and share challenge links.
-            </p>
-          </div>
-        </div>
-
-        <div
-          onClick={onNavigateToLeaderboard}
-          className="p-5 rounded-2xl bg-neutral-900 border border-neutral-800 hover:border-amber-400/60 transition-all cursor-pointer group space-y-2.5"
-        >
-          <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center font-bold">
-            <Trophy className="w-5 h-5" />
-          </div>
-          <div>
-            <h4 className="font-heading font-black text-sm text-white uppercase">Leaderboard Rankings</h4>
-            <p className="text-xs text-neutral-400 mt-0.5">
-              View the top gladiators in Nigeria, win streaks, and rank tiers.
             </p>
           </div>
         </div>

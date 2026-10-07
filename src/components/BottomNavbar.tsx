@@ -1,42 +1,36 @@
 import React from 'react';
 import { UserProfile } from '../types';
 import { Swords, Trophy, ShieldCheck, Clock, User } from 'lucide-react';
-import { NavigationTab } from './Navbar';
 
 interface BottomNavbarProps {
   currentUser: UserProfile;
-  currentTab: NavigationTab;
-  setCurrentTab: (tab: NavigationTab) => void;
+  currentTab: string;
+  onNavigate: (tab: string) => void;
 }
 
 export const BottomNavbar: React.FC<BottomNavbarProps> = ({
   currentUser,
   currentTab,
-  setCurrentTab,
+  onNavigate,
 }) => {
   const navItems = [
     {
-      id: 'arena' as NavigationTab,
+      id: 'arena',
       label: 'Arena',
       icon: Swords,
     },
     {
-      id: 'leaderboard' as NavigationTab,
-      label: 'Ranks',
-      icon: Trophy,
-    },
-    {
-      id: 'rules' as NavigationTab,
+      id: 'rules',
       label: 'Rules',
       icon: ShieldCheck,
     },
     {
-      id: 'history' as NavigationTab,
+      id: 'history',
       label: 'History',
       icon: Clock,
     },
     {
-      id: 'profile' as NavigationTab,
+      id: 'profile',
       label: 'Profile',
       icon: User,
     },
@@ -55,7 +49,7 @@ export const BottomNavbar: React.FC<BottomNavbarProps> = ({
           return (
             <button
               key={item.id}
-              onClick={() => setCurrentTab(item.id)}
+              onClick={() => onNavigate(item.id)}
               className={`relative flex flex-col items-center justify-center py-1.5 px-2.5 sm:px-4 rounded-xl transition-all duration-200 cursor-pointer group ${
                 isActive
                   ? 'bg-amber-400/15 text-amber-400 border border-amber-500/40 shadow-md shadow-amber-500/10'

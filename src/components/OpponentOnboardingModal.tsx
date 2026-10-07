@@ -56,17 +56,17 @@ export const OpponentOnboardingModal: React.FC<OpponentOnboardingModalProps> = (
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="relative w-full max-w-lg bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="relative w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
         {/* Header */}
-        <div className="p-5 border-b border-neutral-800 bg-neutral-950/80 flex items-center justify-between">
+        <div className="p-4 border-b border-neutral-800 bg-neutral-950/80 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
-              <Swords className="w-5 h-5" />
+            <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
+              <Swords className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-base sm:text-lg font-bold font-heading text-white">Accept 1v1 Challenge</h2>
-              <p className="text-xs text-neutral-400">Sign up with your CODM gamer tag to review & stake on #{match.challengeCode}</p>
+              <h2 className="text-sm font-bold font-heading text-white">Accept 1v1 Challenge</h2>
+              <p className="text-[11px] text-neutral-400">Review & stake on #{match.challengeCode}</p>
             </div>
           </div>
           <button
@@ -78,7 +78,7 @@ export const OpponentOnboardingModal: React.FC<OpponentOnboardingModalProps> = (
         </div>
 
         {/* Content */}
-        <form onSubmit={handleSubmit} className="p-5 overflow-y-auto space-y-4">
+        <form onSubmit={handleSubmit} className="p-4 overflow-y-auto space-y-3">
           {error && (
             <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />

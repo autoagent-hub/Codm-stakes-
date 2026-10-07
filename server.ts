@@ -46,6 +46,9 @@ interface UserProfile {
   tier?: string;
   clan?: string;
   avatar: string;
+  bankName?: string;
+  accountNumber?: string;
+  accountName?: string;
   transactions: Array<{
     id: string;
     type: 'DEPOSIT' | 'ESCROW_LOCK' | 'ESCROW_REFUND' | 'MATCH_WIN_PAYOUT' | 'WITHDRAWAL';
@@ -454,7 +457,7 @@ app.patch('/api/users/:id', async (req, res) => {
   const user = users[req.params.id];
   if (!user) return res.status(404).json({ error: 'User not found' });
 
-  const { username, codmIgn, codmUid, email, phone, avatar, tier, clan } = req.body;
+  const { username, codmIgn, codmUid, email, phone, avatar, tier, clan, bankName, accountNumber, accountName } = req.body;
   if (username !== undefined) user.username = username;
   if (codmIgn !== undefined) user.codmIgn = codmIgn;
   if (codmUid !== undefined) user.codmUid = codmUid;
@@ -463,6 +466,9 @@ app.patch('/api/users/:id', async (req, res) => {
   if (avatar !== undefined) user.avatar = avatar;
   if (tier !== undefined) user.tier = tier;
   if (clan !== undefined) user.clan = clan;
+  if (bankName !== undefined) user.bankName = bankName;
+  if (accountNumber !== undefined) user.accountNumber = accountNumber;
+  if (accountName !== undefined) user.accountName = accountName;
 
   await syncUserToDb(user);
   res.json(user);
@@ -941,34 +947,15 @@ Respond strictly in valid JSON format:
     timestamp: Date.now(),
   });
 
-  // Evaluate match resolution:
-  const creatorClaim = match.creator.resultClaim;
-  const opponentClaim = match.opponent?.resultClaim;
-
+  // Evaluate match resolution instantly upon claim:
   let resolveWinner: 'creator' | 'opponent' | 'draw' | 'dispute' | null = null;
 
-  if (creatorClaim === 'DRAW' || opponentClaim === 'DRAW') {
-    // If either or both claim DRAW / Tie -> Resolve as Draw with 100% refund
+  if (claim === 'DRAW') {
     resolveWinner = 'draw';
-  } else if (creatorClaim === 'DEFEAT') {
-    // Creator admitted defeat -> opponent wins
-    resolveWinner = 'opponent';
-  } else if (opponentClaim === 'DEFEAT') {
-    // Opponent admitted defeat -> creator wins
-    resolveWinner = 'creator';
-  } else if (creatorClaim === 'VICTORY' && opponentClaim === 'VICTORY') {
-    // Both claimed victory -> Check AI detection
-    const creatorAi = match.creator.screenshotAnalysis?.detectedOutcome;
-    const opponentAi = match.opponent?.screenshotAnalysis?.detectedOutcome;
-    if (creatorAi === 'VICTORY' && opponentAi === 'DEFEAT') {
-      resolveWinner = 'creator';
-    } else if (opponentAi === 'VICTORY' && creatorAi === 'DEFEAT') {
-      resolveWinner = 'opponent';
-    } else if (creatorAi === 'DRAW' || opponentAi === 'DRAW') {
-      resolveWinner = 'draw';
-    } else {
-      resolveWinner = 'dispute';
-    }
+  } else if (claim === 'VICTORY') {
+    resolveWinner = isCreator ? 'creator' : 'opponent';
+  } else if (claim === 'DEFEAT') {
+    resolveWinner = isCreator ? 'opponent' : 'creator';
   }
 
   if (resolveWinner === 'draw') {
@@ -1042,29 +1029,34 @@ Respond strictly in valid JSON format:
       winnerUser.balance += match.winnerPayout;
       winnerUser.totalWinnings += match.winnerPayout;
       winnerUser.wins += 1;
+      const hasBank = winnerUser.bankName && winnerUser.accountNumber;
+      const payoutDesc = hasBank
+        ? `🏆 Won 1v1 Escrow Match #${match.roomCode} vs ${loserObj.codmIgn}: ₦${match.winnerPayout.toLocaleString()} automatically disbursed to saved bank (${winnerUser.bankName} - ${winnerUser.accountNumber} - ${winnerUser.accountName || winnerUser.codmIgn})`
+        : `🏆 Won 1v1 Escrow Match #${match.roomCode} vs ${loserObj.codmIgn} (₦${match.winnerPayout.toLocaleString()} credited to wallet - Add bank details in profile for automated bank disbursements)`;
+
       winnerUser.transactions.unshift({
         id: `tx_${Date.now()}_win`,
         type: 'MATCH_WIN_PAYOUT',
         amount: match.winnerPayout,
-        description: `🏆 Won 1v1 Escrow Match #${match.roomCode} vs ${loserObj.codmIgn} (₦${match.potAmount.toLocaleString()} pot - ₦${match.platformFee.toLocaleString()} 10% fee)`,
+        description: payoutDesc,
         timestamp: Date.now(),
         matchId: match.id,
       });
+
+      if (loserUser) {
+        loserUser.losses += 1;
+      }
+
+      match.resolutionNotes = `Match verified! Winner is ${winnerObj.codmIgn}. Payout of ₦${match.winnerPayout.toLocaleString()} successfully disbursed ${hasBank ? `to saved bank (${winnerUser.bankName} ${winnerUser.accountNumber})` : `to wallet balance`}.`;
+
+      match.chatMessages.push({
+        id: `msg_${Date.now()}_settle`,
+        senderId: 'SYSTEM',
+        senderName: 'CODM Referee Bot',
+        text: `🏆 MATCH CONCLUDED! Winner: ${winnerObj.codmIgn}. ₦${match.winnerPayout.toLocaleString()} has been sent to their saved bank details (${winnerUser.bankName || 'Wallet'} - ${winnerUser.accountNumber || 'Default'})!`,
+        timestamp: Date.now(),
+      });
     }
-
-    if (loserUser) {
-      loserUser.losses += 1;
-    }
-
-    match.resolutionNotes = `Match verified! Winner is ${winnerObj.codmIgn}. Payout of ₦${match.winnerPayout.toLocaleString()} (₦${match.potAmount.toLocaleString()} pot minus ₦${match.platformFee.toLocaleString()} platform fee) credited to ${winnerObj.codmIgn}'s wallet balance.`;
-
-    match.chatMessages.push({
-      id: `msg_${Date.now()}_settle`,
-      senderId: 'SYSTEM',
-      senderName: 'CODM Referee Bot',
-      text: `🏆 MATCH CONCLUDED! Winner: ${winnerObj.codmIgn}. ₦${match.winnerPayout.toLocaleString()} has been automatically paid out to the winner's wallet!`,
-      timestamp: Date.now(),
-    });
   } else if (resolveWinner === 'dispute') {
     match.status = 'DISPUTED';
     match.resolutionNotes = 'Both players claimed Victory with conflicting proof. Match flagged for referee review.';

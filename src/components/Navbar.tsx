@@ -3,12 +3,10 @@ import { UserProfile } from '../types';
 import { Swords, Plus, Target, LogOut, Clock, User, Trophy, BookOpen, ShieldCheck } from 'lucide-react';
 import { CODM_IMAGES } from '../assets/images';
 
-export type NavigationTab = 'landing' | 'auth' | 'arena' | 'leaderboard' | 'rules' | 'history' | 'profile';
-
-interface NavbarProps {
+export interface NavbarProps {
   currentUser: UserProfile;
-  currentTab: NavigationTab;
-  setCurrentTab: (tab: NavigationTab) => void;
+  currentTab: string;
+  onNavigate: (tab: string) => void;
   openCreateBetModal: () => void;
   onSignOut?: () => void;
 }
@@ -16,7 +14,7 @@ interface NavbarProps {
 export const Navbar: React.FC<NavbarProps> = ({
   currentUser,
   currentTab,
-  setCurrentTab,
+  onNavigate,
   openCreateBetModal,
   onSignOut,
 }) => {
@@ -26,7 +24,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Zone 1: Single text element brand wordmark with Official Logo Emblem */}
         <div className="flex items-center gap-3">
           <button
-            onClick={() => setCurrentTab('arena')}
+            onClick={() => onNavigate('arena')}
             className="flex items-center gap-2.5 group text-left focus:outline-none cursor-pointer"
           >
             <img
@@ -49,7 +47,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Zone 2: Separate Tab Navigation Links */}
         <nav className="hidden md:flex items-center gap-5 lg:gap-6 text-sm font-medium">
           <button
-            onClick={() => setCurrentTab('arena')}
+            onClick={() => onNavigate('arena')}
             className={`transition-colors whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
               currentTab === 'arena' ? 'text-amber-400 font-bold' : 'text-neutral-400 hover:text-neutral-200'
             }`}
@@ -59,17 +57,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
 
           <button
-            onClick={() => setCurrentTab('leaderboard')}
-            className={`transition-colors whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
-              currentTab === 'leaderboard' ? 'text-amber-400 font-bold' : 'text-neutral-400 hover:text-neutral-200'
-            }`}
-          >
-            <Trophy className="w-3.5 h-3.5" />
-            <span>Leaderboard</span>
-          </button>
-
-          <button
-            onClick={() => setCurrentTab('rules')}
+            onClick={() => onNavigate('rules')}
             className={`transition-colors whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
               currentTab === 'rules' ? 'text-amber-400 font-bold' : 'text-neutral-400 hover:text-neutral-200'
             }`}
@@ -79,7 +67,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
 
           <button
-            onClick={() => setCurrentTab('history')}
+            onClick={() => onNavigate('history')}
             className={`transition-colors whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
               currentTab === 'history' ? 'text-amber-400 font-bold' : 'text-neutral-400 hover:text-neutral-200'
             }`}
@@ -89,7 +77,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
 
           <button
-            onClick={() => setCurrentTab('profile')}
+            onClick={() => onNavigate('profile')}
             className={`transition-colors whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
               currentTab === 'profile' ? 'text-amber-400 font-bold' : 'text-neutral-400 hover:text-neutral-200'
             }`}
@@ -113,7 +101,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* User Profile Badge (Clickable to open profile) */}
           <button
-            onClick={() => setCurrentTab('profile')}
+            onClick={() => onNavigate('profile')}
             className={`flex items-center gap-2 p-1.5 rounded-xl border transition-all cursor-pointer text-left ${
               currentTab === 'profile'
                 ? 'bg-amber-500/15 border-amber-400'

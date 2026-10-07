@@ -23,6 +23,9 @@ export interface UserProfile {
   tier?: string;
   clan?: string;
   avatar: string;
+  bankName?: string;
+  accountNumber?: string;
+  accountName?: string;
   transactions: Transaction[];
 }
 
