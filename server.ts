@@ -116,60 +116,7 @@ interface Match {
   resolutionNotes?: string;
 }
 
-const users: Record<string, UserProfile> = {
-  'user_ghost': {
-    id: 'user_ghost',
-    username: 'Ghost_NG',
-    codmIgn: 'GHOST_NG',
-    codmUid: '6829471928371902',
-    tier: 'LEGENDARY TIER',
-    clan: '[1V1_PRO]',
-    email: 'ghost@lagos-codm.com',
-    phone: '+234 803 123 4567',
-    balance: 10000,
-    escrowBalance: 0,
-    totalWinnings: 24500,
-    wins: 14,
-    losses: 3,
-    draws: 1,
-    avatar: 'https://images.unsplash.com/photo-1566492031773-4f4e44671857?w=150&auto=format&fit=crop&q=80',
-    transactions: [
-      {
-        id: 'tx_init_1',
-        type: 'DEPOSIT',
-        amount: 10000,
-        description: 'Instant Bank Transfer top-up (GTBank)',
-        timestamp: Date.now() - 86400000 * 2,
-      },
-    ],
-  },
-  'user_shadow': {
-    id: 'user_shadow',
-    username: 'ShadowSniper',
-    codmIgn: 'ShadowSniper',
-    codmUid: '6948201948271034',
-    tier: 'MASTER V TIER',
-    clan: '[NIGHT_HAWK]',
-    email: 'shadow@esports.ng',
-    phone: '+234 812 987 6543',
-    balance: 5000,
-    escrowBalance: 0,
-    totalWinnings: 12000,
-    wins: 8,
-    losses: 5,
-    draws: 0,
-    avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
-    transactions: [
-      {
-        id: 'tx_init_2',
-        type: 'DEPOSIT',
-        amount: 5000,
-        description: 'Card deposit via Paystack simulation',
-        timestamp: Date.now() - 86400000 * 1,
-      },
-    ],
-  },
-};
+const users: Record<string, UserProfile> = {};
 
 const matches: Record<string, Match> = {};
 
@@ -189,10 +136,7 @@ function generateRoomCode(mapName: string): string {
 }
 
 // Password storage for registered users
-const userPasswords: Record<string, string> = {
-  user_ghost: 'password123',
-  user_shadow: 'password123',
-};
+const userPasswords: Record<string, string> = {};
 
 // Database synchronization helpers
 async function syncUserToDb(user: UserProfile, password?: string) {
@@ -293,6 +237,7 @@ async function syncMatchToDb(match: any) {
 
 async function loadDataFromSupabase() {
   try {
+    await pool.query(`DELETE FROM users WHERE id IN ('user_ghost', 'user_shadow') OR email LIKE '%lagos-codm.com' OR email LIKE '%esports.ng'`);
     const userRows = await pool.query('SELECT * FROM users');
     for (const r of userRows.rows) {
       users[r.id] = {

@@ -5,9 +5,6 @@ import {
   ArrowRight, ArrowLeft, AlertCircle, CheckCircle2, Wallet, Sparkles, UserCheck
 } from 'lucide-react';
 import { CODM_IMAGES } from '../assets/images';
-import { GoogleSignInWidget, GoogleUserProfile } from './GoogleSignInWidget';
-import { signInWithGoogleWidget } from '../services/api';
-import { getUserFromFirestore, syncUserToFirestore } from '../firebase/service';
 
 interface AuthPageProps {
   initialMode?: 'signin' | 'signup';
@@ -124,27 +121,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     }
   };
 
-  const handleGoogleAuthSuccess = async (gUser: GoogleUserProfile) => {
-    setError(null);
-    setLoading(true);
-    try {
-      const profile = await signInWithGoogleWidget(gUser);
-      // Optional background sync to Firestore
-      try {
-        await syncUserToFirestore(profile);
-      } catch (_) {
-        // Firestore sync is optional/non-blocking
-      }
-      if (onGoogleSuccess) {
-        onGoogleSuccess(profile);
-      }
-    } catch (err: any) {
-      setError(err.message || 'Google Sign-In failed');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 flex flex-col justify-between relative overflow-hidden bg-tactical-grid selection:bg-amber-500 selection:text-black py-8 px-4 sm:px-6">
       {/* Background CODM Action Hero overlay */}
@@ -243,21 +219,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({
               <span>{error}</span>
             </div>
           )}
-
-          {/* Embedded Google Identity Services Widget */}
-          <div className="w-full">
-            <GoogleSignInWidget
-              mode={mode}
-              onSuccess={handleGoogleAuthSuccess}
-              onError={(msg) => setError(msg)}
-            />
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="h-px bg-neutral-800 flex-1" />
-            <span className="text-[10px] text-neutral-500 font-mono uppercase tracking-wider">or continue below</span>
-            <div className="h-px bg-neutral-800 flex-1" />
-          </div>
 
           {/* ===================== SIGN UP FORM ===================== */}
           {mode === 'signup' ? (
